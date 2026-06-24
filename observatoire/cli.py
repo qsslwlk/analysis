@@ -26,6 +26,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--semantic-cluster-min-size", type=int, default=8)
     parser.add_argument("--extract-discourse-cards", action="store_true")
     parser.add_argument("--cluster-discourse-cards", action="store_true")
+    parser.add_argument(
+        "--build-discourse-graph",
+        "--build-discursive-graph",
+        dest="build_discourse_graph",
+        action="store_true",
+    )
     parser.add_argument("--extract-claims", action="store_true")
     parser.add_argument("--cluster-claims", action="store_true")
     parser.add_argument("--label-claim-clusters", action="store_true")
@@ -42,6 +48,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--discursive-card-limit", type=int, default=None)
     parser.add_argument("--discursive-cluster-min-size", type=int, default=6)
     parser.add_argument("--discursive-cluster-distance-threshold", type=float, default=0.35)
+    parser.add_argument("--discourse-graph-min-community-size", type=int, default=4)
+    parser.add_argument("--discourse-graph-similarity-threshold", type=float, default=0.18)
+    parser.add_argument("--discourse-graph-top-k", type=int, default=8)
     return parser.parse_args()
 
 
@@ -66,6 +75,7 @@ def main() -> None:
         semantic_cluster_min_size=args.semantic_cluster_min_size,
         extract_discourse_cards=args.extract_discourse_cards,
         cluster_discourse_cards=args.cluster_discourse_cards,
+        build_discourse_graph=args.build_discourse_graph,
         extract_claims=args.extract_claims,
         cluster_claims=args.cluster_claims,
         label_claim_clusters=args.label_claim_clusters,
@@ -82,8 +92,20 @@ def main() -> None:
         discursive_card_limit=args.discursive_card_limit,
         discursive_cluster_min_size=args.discursive_cluster_min_size,
         discursive_cluster_distance_threshold=args.discursive_cluster_distance_threshold,
+        discourse_graph_min_community_size=args.discourse_graph_min_community_size,
+        discourse_graph_similarity_threshold=args.discourse_graph_similarity_threshold,
+        discourse_graph_top_k=args.discourse_graph_top_k,
     )
     print("\nExports générés :")
+    if args.build_discourse_graph:
+        for path in [
+            "outputs/discursive_nodes.csv",
+            "outputs/discursive_edges.csv",
+            "outputs/discursive_similarity_edges.csv",
+            "outputs/discursive_communities.csv",
+            "outputs/discursive_community_profiles.md",
+        ]:
+            print(f" - {path}")
     for key in ["dashboard_path", "interpretation_note_path"]:
         print(f" - {result[key]}")
 

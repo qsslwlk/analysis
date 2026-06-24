@@ -85,6 +85,20 @@ python -m observatoire.cli \
   --discursive-card-limit 50
 ```
 
+La V2.6.3 ajoute un graphe discursif typé construit à partir de ces fiches. Le graphe relie commentaires, frames, claims canoniques, cibles, stances, tonalités, source vidéo et période, puis produit des communautés discursives interprétables.
+
+```bash
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-discourse-cards \
+  --build-discourse-graph \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b \
+  --discursive-card-limit 50
+```
+
+Pour un petit corpus, les communautés peuvent rester vides. Pour explorer seulement, abaissez `--discourse-graph-min-community-size` ou `--discourse-graph-similarity-threshold`.
+
 ## Structure générée
 
 ```text
@@ -106,6 +120,16 @@ python -m observatoire.cli \
     ├── discursive_cards.csv
     ├── discursive_card_coverage.csv
     ├── discursive_clusters.csv
+    ├── discursive_units.csv
+    ├── discursive_units.jsonl
+    ├── discursive_nodes.csv
+    ├── discursive_edges.csv
+    ├── discursive_similarity_edges.csv
+    ├── discursive_communities.csv
+    ├── discursive_community_profiles.md
+    ├── discursive_incidence_frame.npz
+    ├── discursive_incidence_claim.npz
+    ├── discursive_incidence_stance.npz
     ├── comment_claims.csv
     ├── no_claim_summary.csv
     ├── claim_clusters.csv
@@ -245,6 +269,8 @@ Erreurs gérées explicitement :
 - Garde-fou petit volume : les clusters sémantiques trop petits restent en bruit au lieu d'être forcés dans des familles artificielles.
 - Fiches discursives structurées optionnelles par LLM : thème, cadrage, stance, argument, tonalité, ambiguïtés et citations.
 - Clustering optionnel des fiches discursives pour cartographier des proximités de discours sans fine-tuning.
+- Graphe discursif typé V2.6.3 : commentaires reliés à frames, claims canoniques, cibles, stances, tonalités, source vidéo et période.
+- Communautés discursives interprétables à partir d'une similarité hybride par matrices d'incidence pondérées.
 - Extraction inductive optionnelle de claims par LLM OpenAI ou Ollama, avec preuve textuelle obligatoire.
 - Clustering optionnel des claims plutôt que des commentaires bruts.
 - Réduction 2D par PCA, UMAP si disponible.
@@ -303,16 +329,16 @@ Socle posé :
 - Contrôle simple des colonnes sensibles avant export.
 - Filtre de qualité sémantique avant embeddings/clusters.
 - Extraction inductive de claims et clustering de claims.
+- Fiches discursives LLM, graphe typé V2.6.3 et communautés discursives interprétables.
 - Tests unitaires sur config, cache et privacy.
 
 Prochaines extensions :
 
 - BERTopic pour des topics plus lisibles.
-- HDBSCAN pour des clusters de densité sans fixer `k`.
 - Détection de stance par modèle local ou API.
 - Annotation humaine assistée.
 - Comparaison avec données Matomo agrégées.
-- Graphe dynamique des cadrages.
+- Graphe dynamique temporel des communautés discursives.
 - Modèle markovien acteur-cadrage.
 - Score agrégé de sortie de bulle.
 - Détection de recodages adverses.
