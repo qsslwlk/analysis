@@ -45,6 +45,7 @@ from sklearn.metrics.pairwise import cosine_distances
 from observatoire.cache import DatasetCache, build_raw_cache_context
 from observatoire.config import load_video_config
 from observatoire.privacy import assert_privacy_safe_columns
+from observatoire.text_quality import SEMANTIC_STOPWORDS, semantic_exclusion_reason, text_quality_metrics
 
 
 VIDEOS = [
@@ -1106,7 +1107,8 @@ def _top_tfidf_terms(texts: Sequence[str], n_terms: int = 8) -> List[str]:
             max_features=4000,
             ngram_range=(1, 2),
             min_df=1,
-            stop_words=FRENCH_STOPWORDS,
+            stop_words=sorted(set(FRENCH_STOPWORDS).union(SEMANTIC_STOPWORDS)),
+            token_pattern=r"(?u)\b[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ]{2,}\b",
         )
         matrix = vectorizer.fit_transform(texts)
         if matrix.shape[1] == 0:
@@ -1770,6 +1772,8 @@ def run_pipeline(
     outputs_dir: Path | str = "outputs",
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
     skip_embeddings: bool = False,
+    min_cluster_chars: int = 80,
+    min_cluster_meaningful_tokens: int = 8,
 ) -> Dict[str, Any]:
     """Run the full POC pipeline and export all requested files."""
     data_path, outputs_path = ensure_dirs(data_dir, outputs_dir)
@@ -1806,6 +1810,33 @@ def run_pipeline(
         raw_df, metadata_df = cached
 
     enriched_df = enrich_text_and_frames(raw_df)
+    if not enriched_df.empty:
+        quality = enriched_df["text_clean"].map(text_quality_metrics)
+        enriched_df["semantic_char_count"] = quality.map(lambda metrics: metrics["char_count"])
+        enriched_df["semantic_meaningful_token_count"] = quality.map(
+            lambda metrics: metrics["meaningful_token_count"]
+        )
+        enriched_df["semantic_exclusion_reason"] = enriched_df["text_clean"].map(
+            lambda text: semantic_exclusion_reason(
+                text,
+                min_chars=min_cluster_chars,
+                min_meaningful_tokens=min_cluster_meaningful_tokens,
+            )
+        )
+        enriched_df["semantic_candidate"] = enriched_df["semantic_exclusion_reason"] == "ok"
+        filter_summary = (
+            enriched_df.groupby(["semantic_exclusion_reason"], as_index=False)
+            .agg(n_comments=("comment_id", "nunique"))
+            .sort_values("n_comments", ascending=False)
+        )
+        filter_summary.to_csv(outputs_path / "semantic_filter_summary.csv", index=False)
+    else:
+        enriched_df["semantic_candidate"] = []
+        enriched_df["semantic_exclusion_reason"] = []
+        pd.DataFrame(columns=["semantic_exclusion_reason", "n_comments"]).to_csv(
+            outputs_path / "semantic_filter_summary.csv",
+            index=False,
+        )
     assert_privacy_safe_columns(enriched_df.columns)
     enriched_df.to_csv(data_path / "youtube_comments_enriched.csv", index=False)
     frame_tables = compute_frame_tables(enriched_df, outputs_path)
@@ -1816,12 +1847,17 @@ def run_pipeline(
     trajectories_df = pd.DataFrame()
     reception_df = pd.DataFrame()
 
-    non_empty_mask = semantic_df["text_clean"].fillna("").str.len() > 0 if not semantic_df.empty else pd.Series(dtype=bool)
+    non_empty_mask = (
+        semantic_df["semantic_candidate"].fillna(False).astype(bool)
+        if not semantic_df.empty and "semantic_candidate" in semantic_df.columns
+        else pd.Series(dtype=bool)
+    )
     if skip_embeddings:
         print("Embeddings désactivés (--skip-embeddings).")
     elif not semantic_df.empty and non_empty_mask.any():
         texts = semantic_df.loc[non_empty_mask, "text_clean"].tolist()
-        print(f"Calcul embeddings pour {len(texts)} commentaire(s).")
+        excluded = int((~non_empty_mask).sum())
+        print(f"Calcul embeddings pour {len(texts)} commentaire(s) candidat(s). {excluded} exclu(s) du clustering.")
         embeddings_subset = compute_embeddings(texts, model_name=embedding_model)
         semantic_subset, clusters_df, _ = cluster_embeddings(
             semantic_df.loc[non_empty_mask].reset_index(drop=True),
@@ -1904,6 +1940,18 @@ def parse_args() -> argparse.Namespace:
         help="Modèle SentenceTransformer multilingue léger.",
     )
     parser.add_argument("--skip-embeddings", action="store_true", help="Ne produire que la collecte et le lexique.")
+    parser.add_argument(
+        "--min-cluster-chars",
+        type=int,
+        default=80,
+        help="Longueur minimale pour inclure un commentaire dans les embeddings/clusters.",
+    )
+    parser.add_argument(
+        "--min-cluster-meaningful-tokens",
+        type=int,
+        default=8,
+        help="Nombre minimal de tokens informatifs pour inclure un commentaire dans les embeddings/clusters.",
+    )
     return parser.parse_args()
 
 
@@ -1921,6 +1969,8 @@ def main() -> None:
         outputs_dir=args.outputs_dir,
         embedding_model=args.embedding_model,
         skip_embeddings=args.skip_embeddings,
+        min_cluster_chars=args.min_cluster_chars,
+        min_cluster_meaningful_tokens=args.min_cluster_meaningful_tokens,
     )
     print("\nExports générés :")
     print(" - data/youtube_comments_raw_anonymized.csv")
@@ -1929,6 +1979,7 @@ def main() -> None:
     print(" - outputs/frame_actor_matrix.csv")
     print(" - outputs/frame_time_series.csv")
     print(" - outputs/semantic_clusters.csv")
+    print(" - outputs/semantic_filter_summary.csv")
     print(" - outputs/reception_distance_by_video.csv")
     print(f" - {result['dashboard_path']}")
     print(f" - {result['interpretation_note_path']}")
