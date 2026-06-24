@@ -21,6 +21,8 @@ def parse_args() -> argparse.Namespace:
         default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
     )
     parser.add_argument("--skip-embeddings", action="store_true")
+    parser.add_argument("--min-cluster-chars", type=int, default=80)
+    parser.add_argument("--min-cluster-meaningful-tokens", type=int, default=8)
     return parser.parse_args()
 
 
@@ -40,6 +42,8 @@ def main() -> None:
         outputs_dir=args.outputs_dir,
         embedding_model=args.embedding_model,
         skip_embeddings=args.skip_embeddings,
+        min_cluster_chars=args.min_cluster_chars,
+        min_cluster_meaningful_tokens=args.min_cluster_meaningful_tokens,
     )
     print("\nExports générés :")
     for key in ["dashboard_path", "interpretation_note_path"]:

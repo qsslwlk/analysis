@@ -48,6 +48,7 @@ python -m observatoire.cli --config config/corpus.example.json --max-comments-pe
     ├── frame_actor_matrix.csv
     ├── frame_time_series.csv
     ├── semantic_clusters.csv
+    ├── semantic_filter_summary.csv
     ├── reception_distance_by_video.csv
     ├── semantic_actor_trajectories.csv
     ├── interpretation_note.md
@@ -179,6 +180,7 @@ Erreurs gérées explicitement :
 - Tonalité / stance lexicale prudente : adhésion, rejet, ironie, scepticisme, incompréhension, déplacement du débat.
 - Matrices `acteur × cadrage`, `semaine × cadrage`, `vidéo × cadrage`.
 - Embeddings multilingues avec `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`.
+- Filtrage des commentaires trop courts, emoji-only ou réactionnels avant clustering sémantique.
 - Réduction 2D par PCA, UMAP si disponible.
 - Clustering KMeans robuste pour petit volume.
 - Mots caractéristiques par cluster via TF-IDF.
@@ -233,6 +235,7 @@ Socle posé :
 - Configuration externe du corpus et des lexiques.
 - Cache manifesté pour éviter les réutilisations incohérentes.
 - Contrôle simple des colonnes sensibles avant export.
+- Filtre de qualité sémantique avant embeddings/clusters.
 - Tests unitaires sur config, cache et privacy.
 
 Prochaines extensions :

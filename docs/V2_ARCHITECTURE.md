@@ -27,10 +27,19 @@ Le manifeste encode les paramètres qui changent le périmètre de collecte :
 
 Si l'un de ces paramètres change, la collecte est relancée au lieu de réutiliser silencieusement un cache incompatible.
 
+## Qualité Sémantique
+
+Les commentaires restent tous présents dans `data/youtube_comments_enriched.csv`, mais seuls les commentaires suffisamment discursifs participent aux embeddings et aux clusters. Le pipeline exclut par défaut :
+
+- les commentaires sans tokens alphabétiques, par exemple emoji-only ;
+- les réactions courtes centrées sur des noms ou encouragements ;
+- les commentaires trop courts pour produire un cadrage interprétable.
+
+Les seuils peuvent être ajustés avec `--min-cluster-chars` et `--min-cluster-meaningful-tokens`. Le fichier `outputs/semantic_filter_summary.csv` résume les exclusions par raison.
+
 ## Prochaines Étapes
 
 - Déplacer progressivement les fonctions de `observatoire_youtube_poc.py` vers `collectors/`, `processing/`, `frames/`, `models/` et `reports/`.
 - Ajouter un import Matomo agrégé pour relier contenus, UTM, CTA et conversions sans scoring individuel.
 - Ajouter un flux d'annotation humaine assistée pour valider les cadrages et entraîner un classifieur supervisé.
 - Ajouter un rapport qualité de données par run : vidéos sans commentaires, erreurs API, langues, doublons, volume par acteur.
-
