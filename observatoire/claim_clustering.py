@@ -15,6 +15,22 @@ from sklearn.metrics import pairwise_distances
 from observatoire.text_quality import SEMANTIC_STOPWORDS
 
 
+CLAIM_CLUSTER_COLUMNS = [
+    "claim_cluster",
+    "size",
+    "share",
+    "top_terms",
+    "label_auto",
+    "mean_confidence",
+    "actor_distribution_json",
+    "examples_json",
+]
+
+
+def empty_claim_clusters_df() -> pd.DataFrame:
+    return pd.DataFrame(columns=CLAIM_CLUSTER_COLUMNS)
+
+
 def _top_terms(texts: Sequence[str], n_terms: int = 8) -> List[str]:
     if not texts:
         return []
@@ -62,7 +78,7 @@ def cluster_claims(
     if claims_df.empty or embeddings.size == 0:
         claims_out = claims_df.copy()
         claims_out["claim_cluster"] = []
-        clusters_out = pd.DataFrame()
+        clusters_out = empty_claim_clusters_df()
         claims_out.to_csv(outputs_path / "comment_claims.csv", index=False)
         clusters_out.to_csv(outputs_path / "claim_clusters.csv", index=False)
         return claims_out, clusters_out
@@ -107,8 +123,10 @@ def cluster_claims(
             }
         )
 
-    clusters_out = pd.DataFrame(cluster_rows).sort_values("size", ascending=False)
+    clusters_out = pd.DataFrame(cluster_rows, columns=CLAIM_CLUSTER_COLUMNS).sort_values(
+        "size",
+        ascending=False,
+    )
     claims_out.to_csv(outputs_path / "comment_claims.csv", index=False)
     clusters_out.to_csv(outputs_path / "claim_clusters.csv", index=False)
     return claims_out, clusters_out
-
