@@ -1,0 +1,23 @@
+{
+  "videos": [
+    {
+      "video_url": "https://www.youtube.com/watch?v=V0xwB3ctfHo",
+      "actor": "LFI",
+      "sequence": "pouvoir_achat",
+      "label": "Pouvoir d'achat : ce que nous allons faire - Clip officiel"
+    },
+    {
+      "video_url": "https://www.youtube.com/watch?v=A4FMuKKdQto",
+      "actor": "RN",
+      "sequence": "pouvoir_achat",
+      "label": "Immigration, pouvoir d'achat, énergie... Interview de Jordan Bardella"
+    },
+    {
+      "video_url": "https://www.youtube.com/watch?v=N7aB5Wn-X7g",
+      "actor": "Media",
+      "sequence": "pouvoir_achat",
+      "label": "Pouvoir d'achat, salaires, impôts : qui propose quoi ?"
+    }
+  ]
+}
+
