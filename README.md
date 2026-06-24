@@ -59,6 +59,20 @@ python -m observatoire.cli \
 
 Si Ollama tourne ailleurs que sur `http://localhost:11434`, utilisez `--llm-base-url` ou `OLLAMA_BASE_URL`.
 
+Pour un test rapide avec très peu de commentaires, les clusters peuvent rester vides : c'est volontairement plus prudent que de forcer des groupes bruités. Vous pouvez abaisser les seuils uniquement pour exploration :
+
+```bash
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-claims \
+  --cluster-claims \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b \
+  --max-comments-per-video 10 \
+  --semantic-cluster-min-size 3 \
+  --claim-cluster-min-size 3
+```
+
 La V2.6.1 ajoute l'option 1 de cartographie discursive : une fiche structurée par verbatim, produite par LLM sans fine-tuning, puis clusterisée.
 
 ```bash
@@ -228,6 +242,7 @@ Erreurs gérées explicitement :
 - Matrices `acteur × cadrage`, `semaine × cadrage`, `vidéo × cadrage`.
 - Embeddings multilingues avec `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`.
 - Filtrage des commentaires trop courts, emoji-only ou réactionnels avant clustering sémantique.
+- Garde-fou petit volume : les clusters sémantiques trop petits restent en bruit au lieu d'être forcés dans des familles artificielles.
 - Fiches discursives structurées optionnelles par LLM : thème, cadrage, stance, argument, tonalité, ambiguïtés et citations.
 - Clustering optionnel des fiches discursives pour cartographier des proximités de discours sans fine-tuning.
 - Extraction inductive optionnelle de claims par LLM OpenAI ou Ollama, avec preuve textuelle obligatoire.

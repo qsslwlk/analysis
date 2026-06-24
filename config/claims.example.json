@@ -5,7 +5,7 @@
   "llm_provider": "openai",
   "llm_model": "gpt-4.1-mini",
   "llm_base_url": null,
-  "max_claims_per_comment": 3,
+  "max_claims_per_comment": 1,
   "claim_min_confidence": 0.65,
   "claim_cluster_min_size": 8,
   "claim_cluster_distance_threshold": 0.35

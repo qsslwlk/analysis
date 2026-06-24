@@ -23,6 +23,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-embeddings", action="store_true")
     parser.add_argument("--min-cluster-chars", type=int, default=80)
     parser.add_argument("--min-cluster-meaningful-tokens", type=int, default=8)
+    parser.add_argument("--semantic-cluster-min-size", type=int, default=8)
     parser.add_argument("--extract-discourse-cards", action="store_true")
     parser.add_argument("--cluster-discourse-cards", action="store_true")
     parser.add_argument("--extract-claims", action="store_true")
@@ -32,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-model", default="gpt-4.1-mini")
     parser.add_argument("--llm-api-key", default=None)
     parser.add_argument("--llm-base-url", default=None)
-    parser.add_argument("--max-claims-per-comment", type=int, default=3)
+    parser.add_argument("--max-claims-per-comment", type=int, default=1)
     parser.add_argument("--claim-min-confidence", type=float, default=0.65)
     parser.add_argument("--claim-extraction-limit", type=int, default=None)
     parser.add_argument("--claim-cluster-min-size", type=int, default=8)
@@ -62,6 +63,7 @@ def main() -> None:
         skip_embeddings=args.skip_embeddings,
         min_cluster_chars=args.min_cluster_chars,
         min_cluster_meaningful_tokens=args.min_cluster_meaningful_tokens,
+        semantic_cluster_min_size=args.semantic_cluster_min_size,
         extract_discourse_cards=args.extract_discourse_cards,
         cluster_discourse_cards=args.cluster_discourse_cards,
         extract_claims=args.extract_claims,
