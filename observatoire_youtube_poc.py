@@ -50,6 +50,8 @@ from observatoire.claims import extract_claims_from_comments, write_no_claim_sum
 from observatoire.config import load_video_config
 from observatoire.discourse_cards import extract_discursive_cards_from_comments, write_discursive_card_coverage
 from observatoire.discourse_clustering import cluster_discursive_cards, empty_discursive_clusters_df
+from observatoire.discourse_graph import build_discourse_graph as build_discourse_graph_exports
+from observatoire.discourse_graph import empty_discursive_communities_df
 from observatoire.llm import make_llm_client
 from observatoire.privacy import assert_privacy_safe_columns
 from observatoire.text_quality import SEMANTIC_STOPWORDS, semantic_exclusion_reason, text_quality_metrics
@@ -1800,6 +1802,7 @@ def run_pipeline(
     semantic_cluster_min_size: int = 8,
     extract_discourse_cards: bool = False,
     cluster_discourse_cards: bool = False,
+    build_discourse_graph: bool = False,
     extract_claims: bool = False,
     cluster_claims: bool = False,
     label_claim_clusters: bool = False,
@@ -1816,6 +1819,9 @@ def run_pipeline(
     discursive_card_limit: Optional[int] = None,
     discursive_cluster_min_size: int = 6,
     discursive_cluster_distance_threshold: float = 0.35,
+    discourse_graph_min_community_size: int = 4,
+    discourse_graph_similarity_threshold: float = 0.18,
+    discourse_graph_top_k: int = 8,
 ) -> Dict[str, Any]:
     """Run the full POC pipeline and export all requested files."""
     data_path, outputs_path = ensure_dirs(data_dir, outputs_dir)
@@ -1893,6 +1899,9 @@ def run_pipeline(
     claim_cluster_labels_path: Optional[Path] = None
     discursive_cards_df = pd.DataFrame()
     discursive_clusters_df = empty_discursive_clusters_df()
+    discursive_embeddings = np.empty((0, 0))
+    discursive_communities_df = empty_discursive_communities_df()
+    discourse_graph_result = None
 
     non_empty_mask = (
         semantic_df["semantic_candidate"].fillna(False).astype(bool)
@@ -1934,7 +1943,7 @@ def run_pipeline(
         trajectories_df.to_csv(outputs_path / "semantic_actor_trajectories.csv", index=False)
         reception_df.to_csv(outputs_path / "reception_distance_by_video.csv", index=False)
 
-    should_extract_discourse_cards = extract_discourse_cards or cluster_discourse_cards
+    should_extract_discourse_cards = extract_discourse_cards or cluster_discourse_cards or build_discourse_graph
     if should_extract_discourse_cards:
         client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key, base_url=llm_base_url)
         if client is None:
@@ -1972,6 +1981,31 @@ def run_pipeline(
             )
     elif should_extract_discourse_cards:
         discursive_clusters_df.to_csv(outputs_path / "discursive_clusters.csv", index=False)
+
+    if build_discourse_graph:
+        graph_embeddings = None
+        if not discursive_cards_df.empty and not skip_embeddings:
+            if discursive_embeddings.size == 0 or discursive_embeddings.shape[0] != len(discursive_cards_df):
+                print(f"Calcul embeddings pour {len(discursive_cards_df)} fiche(s) discursive(s) du graphe.")
+                discursive_embeddings = compute_embeddings(
+                    discursive_cards_df["discursive_summary"].fillna("").tolist(),
+                    model_name=embedding_model,
+                )
+            graph_embeddings = discursive_embeddings
+        if discursive_cards_df.empty:
+            print("Graphe discursif ignoré : aucune fiche discursive exploitable.")
+        else:
+            print(f"Construction du graphe discursif V2.6.3 pour {len(discursive_cards_df)} fiche(s).")
+        discourse_graph_result = build_discourse_graph_exports(
+            discursive_cards_df,
+            semantic_df,
+            embeddings=graph_embeddings,
+            outputs_dir=outputs_path,
+            min_community_size=discourse_graph_min_community_size,
+            similarity_threshold=discourse_graph_similarity_threshold,
+            top_k=discourse_graph_top_k,
+        )
+        discursive_communities_df = discourse_graph_result.communities_df
 
     should_extract_claims = extract_claims or cluster_claims or label_claim_clusters
     if should_extract_claims:
@@ -2043,6 +2077,8 @@ def run_pipeline(
         "claim_cluster_labels_path": claim_cluster_labels_path,
         "discursive_cards_df": discursive_cards_df,
         "discursive_clusters_df": discursive_clusters_df,
+        "discursive_communities_df": discursive_communities_df,
+        "discourse_graph_result": discourse_graph_result,
         "embeddings": embeddings,
         "dashboard_path": dashboard_path,
         "interpretation_note_path": note_path,
@@ -2090,6 +2126,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--extract-discourse-cards", action="store_true", help="Extraire des fiches discursives V2.6.1 par LLM.")
     parser.add_argument("--cluster-discourse-cards", action="store_true", help="Clusteriser les fiches discursives V2.6.1.")
+    parser.add_argument(
+        "--build-discourse-graph",
+        "--build-discursive-graph",
+        dest="build_discourse_graph",
+        action="store_true",
+        help="Construire le graphe discursif typé V2.6.3 à partir des fiches LLM.",
+    )
     parser.add_argument("--extract-claims", action="store_true", help="Extraire des claims inductifs par LLM.")
     parser.add_argument("--cluster-claims", action="store_true", help="Clusteriser les claims extraits.")
     parser.add_argument("--label-claim-clusters", action="store_true", help="Nommer les clusters de claims.")
@@ -2106,6 +2149,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--discursive-card-limit", type=int, default=None)
     parser.add_argument("--discursive-cluster-min-size", type=int, default=6)
     parser.add_argument("--discursive-cluster-distance-threshold", type=float, default=0.35)
+    parser.add_argument("--discourse-graph-min-community-size", type=int, default=4)
+    parser.add_argument("--discourse-graph-similarity-threshold", type=float, default=0.18)
+    parser.add_argument("--discourse-graph-top-k", type=int, default=8)
     return parser.parse_args()
 
 
@@ -2128,6 +2174,7 @@ def main() -> None:
         semantic_cluster_min_size=args.semantic_cluster_min_size,
         extract_discourse_cards=args.extract_discourse_cards,
         cluster_discourse_cards=args.cluster_discourse_cards,
+        build_discourse_graph=args.build_discourse_graph,
         extract_claims=args.extract_claims,
         cluster_claims=args.cluster_claims,
         label_claim_clusters=args.label_claim_clusters,
@@ -2144,6 +2191,9 @@ def main() -> None:
         discursive_card_limit=args.discursive_card_limit,
         discursive_cluster_min_size=args.discursive_cluster_min_size,
         discursive_cluster_distance_threshold=args.discursive_cluster_distance_threshold,
+        discourse_graph_min_community_size=args.discourse_graph_min_community_size,
+        discourse_graph_similarity_threshold=args.discourse_graph_similarity_threshold,
+        discourse_graph_top_k=args.discourse_graph_top_k,
     )
     print("\nExports générés :")
     print(" - data/youtube_comments_raw_anonymized.csv")
@@ -2154,10 +2204,16 @@ def main() -> None:
     print(" - outputs/semantic_clusters.csv")
     print(" - outputs/semantic_filter_summary.csv")
     print(" - outputs/reception_distance_by_video.csv")
-    if args.extract_discourse_cards or args.cluster_discourse_cards:
+    if args.extract_discourse_cards or args.cluster_discourse_cards or args.build_discourse_graph:
         print(" - outputs/discursive_cards.csv")
         print(" - outputs/discursive_card_coverage.csv")
         print(" - outputs/discursive_clusters.csv")
+    if args.build_discourse_graph:
+        print(" - outputs/discursive_nodes.csv")
+        print(" - outputs/discursive_edges.csv")
+        print(" - outputs/discursive_similarity_edges.csv")
+        print(" - outputs/discursive_communities.csv")
+        print(" - outputs/discursive_community_profiles.md")
     if args.extract_claims or args.cluster_claims or args.label_claim_clusters:
         print(" - outputs/comment_claims.csv")
         print(" - outputs/no_claim_summary.csv")

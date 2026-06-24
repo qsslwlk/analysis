@@ -1,6 +1,6 @@
 # Architecture V2
 
-La V2 garde le POC YouTube exécutable, mais ajoute une couche de production légère autour de lui. L'objectif est de passer d'un notebook démonstrateur à un observatoire reproductible, auditables et compatible avec une extension Matomo.
+La V2 garde le POC YouTube exécutable, mais ajoute une couche de production légère autour de lui. L'objectif est de passer d'un notebook démonstrateur à un observatoire reproductible, auditable et compatible avec une extension Matomo.
 
 ## Modules
 
@@ -109,9 +109,38 @@ Outputs :
 
 Cette couche ne remplace pas les claims V2.5. Les claims restent utiles pour isoler des assertions courtes ; les fiches discursives sont plus larges et préservent davantage de nuance.
 
+## Hypergraphe Discursif V2.6.3
+
+La V2.6.3 formalise et implémente un premier POC de graphe discursif typé. La note `docs/V2_6_3_HYPERGRAPHE_DISCURSIF.md` propose le schéma de données, les types de nœuds et relations, la pondération IDF, la similarité hybride, les méthodes de communautés, les sorties produit et les garde-fous méthodologiques.
+
+La recommandation est de commencer par un graphe biparti interprétable `commentaires ↔ attributs discursifs` avant d'envisager du message passing neuronal. Les embeddings restent utiles, mais comme composante secondaire d'une similarité hybride, pas comme unique fondation de la carte.
+
+Commande type :
+
+```bash
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-discourse-cards \
+  --build-discourse-graph \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b \
+  --discursive-card-limit 50
+```
+
+Outputs :
+
+- `outputs/discursive_units.csv` et `outputs/discursive_units.jsonl` : fiches enrichies avec période, canal et communauté.
+- `outputs/discursive_nodes.csv` : nœuds typés du graphe, avec signalement des nœuds vagues.
+- `outputs/discursive_edges.csv` : relations typées pondérées par confiance, IDF et pénalité des hubs vagues.
+- `outputs/discursive_incidence_*.npz` : matrices d'incidence sparse par type de relation.
+- `outputs/discursive_similarity_edges.csv` : arêtes commentaire-commentaire issues de la similarité hybride.
+- `outputs/discursive_communities.csv` : profils tabulaires des communautés discursives.
+- `outputs/discursive_community_profiles.md` : lecture interprétable des communautés avec citations.
+
 ## Prochaines Étapes
 
 - Déplacer progressivement les fonctions de `observatoire_youtube_poc.py` vers `collectors/`, `processing/`, `frames/`, `models/` et `reports/`.
 - Ajouter un import Matomo agrégé pour relier contenus, UTM, CTA et conversions sans scoring individuel.
-- Ajouter un flux d'annotation humaine assistée pour valider les cadrages et entraîner un classifieur supervisé.
+- Ajouter un flux d'annotation humaine assistée pour valider les cadrages, stances, claims canoniques et communautés discursives.
+- Ajouter une analyse temporelle `G_t` des communautés discursives.
 - Ajouter un rapport qualité de données par run : vidéos sans commentaires, erreurs API, langues, doublons, volume par acteur.

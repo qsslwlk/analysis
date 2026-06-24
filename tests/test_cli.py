@@ -16,6 +16,7 @@ class CliTest(unittest.TestCase):
         self.assertIn("--config", result.stdout)
         self.assertIn("--extract-discourse-cards", result.stdout)
         self.assertIn("--cluster-discourse-cards", result.stdout)
+        self.assertIn("--build-discourse-graph", result.stdout)
 
 
 if __name__ == "__main__":
