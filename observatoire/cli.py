@@ -23,6 +23,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-embeddings", action="store_true")
     parser.add_argument("--min-cluster-chars", type=int, default=80)
     parser.add_argument("--min-cluster-meaningful-tokens", type=int, default=8)
+    parser.add_argument("--extract-claims", action="store_true")
+    parser.add_argument("--cluster-claims", action="store_true")
+    parser.add_argument("--label-claim-clusters", action="store_true")
+    parser.add_argument("--llm-provider", default="openai")
+    parser.add_argument("--llm-model", default="gpt-4.1-mini")
+    parser.add_argument("--llm-api-key", default=None)
+    parser.add_argument("--max-claims-per-comment", type=int, default=3)
+    parser.add_argument("--claim-min-confidence", type=float, default=0.65)
+    parser.add_argument("--claim-extraction-limit", type=int, default=None)
+    parser.add_argument("--claim-cluster-min-size", type=int, default=8)
+    parser.add_argument("--claim-cluster-distance-threshold", type=float, default=0.35)
     return parser.parse_args()
 
 
@@ -44,6 +55,17 @@ def main() -> None:
         skip_embeddings=args.skip_embeddings,
         min_cluster_chars=args.min_cluster_chars,
         min_cluster_meaningful_tokens=args.min_cluster_meaningful_tokens,
+        extract_claims=args.extract_claims,
+        cluster_claims=args.cluster_claims,
+        label_claim_clusters=args.label_claim_clusters,
+        llm_provider=args.llm_provider,
+        llm_model=args.llm_model,
+        llm_api_key=args.llm_api_key,
+        max_claims_per_comment=args.max_claims_per_comment,
+        claim_min_confidence=args.claim_min_confidence,
+        claim_extraction_limit=args.claim_extraction_limit,
+        claim_cluster_min_size=args.claim_cluster_min_size,
+        claim_cluster_distance_threshold=args.claim_cluster_distance_threshold,
     )
     print("\nExports générés :")
     for key in ["dashboard_path", "interpretation_note_path"]:

@@ -31,6 +31,17 @@ Le script `observatoire_youtube_poc.py` reste exécutable comme avant. L'entrée
 python -m observatoire.cli --config config/corpus.example.json --max-comments-per-video 100
 ```
 
+La V2.5 ajoute une extraction inductive optionnelle de claims par LLM :
+
+```bash
+export OPENAI_API_KEY="..."
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-claims \
+  --cluster-claims \
+  --label-claim-clusters
+```
+
 ## Structure générée
 
 ```text
@@ -49,6 +60,10 @@ python -m observatoire.cli --config config/corpus.example.json --max-comments-pe
     ├── frame_time_series.csv
     ├── semantic_clusters.csv
     ├── semantic_filter_summary.csv
+    ├── comment_claims.csv
+    ├── no_claim_summary.csv
+    ├── claim_clusters.csv
+    ├── claim_cluster_labels.md
     ├── reception_distance_by_video.csv
     ├── semantic_actor_trajectories.csv
     ├── interpretation_note.md
@@ -181,6 +196,8 @@ Erreurs gérées explicitement :
 - Matrices `acteur × cadrage`, `semaine × cadrage`, `vidéo × cadrage`.
 - Embeddings multilingues avec `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`.
 - Filtrage des commentaires trop courts, emoji-only ou réactionnels avant clustering sémantique.
+- Extraction inductive optionnelle de claims par LLM, avec preuve textuelle obligatoire.
+- Clustering optionnel des claims plutôt que des commentaires bruts.
 - Réduction 2D par PCA, UMAP si disponible.
 - Clustering KMeans robuste pour petit volume.
 - Mots caractéristiques par cluster via TF-IDF.
@@ -236,6 +253,7 @@ Socle posé :
 - Cache manifesté pour éviter les réutilisations incohérentes.
 - Contrôle simple des colonnes sensibles avant export.
 - Filtre de qualité sémantique avant embeddings/clusters.
+- Extraction inductive de claims et clustering de claims.
 - Tests unitaires sur config, cache et privacy.
 
 Prochaines extensions :

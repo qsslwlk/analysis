@@ -43,7 +43,12 @@ from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import cosine_distances
 
 from observatoire.cache import DatasetCache, build_raw_cache_context
+from observatoire.claim_clustering import cluster_claims as cluster_extracted_claims
+from observatoire.claim_labeling import label_claim_clusters as label_extracted_claim_clusters
+from observatoire.claim_labeling import write_claim_cluster_labels
+from observatoire.claims import extract_claims_from_comments, write_no_claim_summary
 from observatoire.config import load_video_config
+from observatoire.llm import make_llm_client
 from observatoire.privacy import assert_privacy_safe_columns
 from observatoire.text_quality import SEMANTIC_STOPWORDS, semantic_exclusion_reason, text_quality_metrics
 
@@ -1774,6 +1779,17 @@ def run_pipeline(
     skip_embeddings: bool = False,
     min_cluster_chars: int = 80,
     min_cluster_meaningful_tokens: int = 8,
+    extract_claims: bool = False,
+    cluster_claims: bool = False,
+    label_claim_clusters: bool = False,
+    llm_provider: str = "openai",
+    llm_model: str = "gpt-4.1-mini",
+    llm_api_key: Optional[str] = None,
+    max_claims_per_comment: int = 3,
+    claim_min_confidence: float = 0.65,
+    claim_extraction_limit: Optional[int] = None,
+    claim_cluster_min_size: int = 8,
+    claim_cluster_distance_threshold: float = 0.35,
 ) -> Dict[str, Any]:
     """Run the full POC pipeline and export all requested files."""
     data_path, outputs_path = ensure_dirs(data_dir, outputs_dir)
@@ -1846,6 +1862,9 @@ def run_pipeline(
     semantic_df = enriched_df.copy()
     trajectories_df = pd.DataFrame()
     reception_df = pd.DataFrame()
+    claims_df = pd.DataFrame()
+    claim_clusters_df = pd.DataFrame()
+    claim_cluster_labels_path: Optional[Path] = None
 
     non_empty_mask = (
         semantic_df["semantic_candidate"].fillna(False).astype(bool)
@@ -1886,6 +1905,44 @@ def run_pipeline(
         trajectories_df.to_csv(outputs_path / "semantic_actor_trajectories.csv", index=False)
         reception_df.to_csv(outputs_path / "reception_distance_by_video.csv", index=False)
 
+    should_extract_claims = extract_claims or cluster_claims or label_claim_clusters
+    if should_extract_claims:
+        client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key)
+        if client is None:
+            raise RuntimeError("Claim extraction requires an LLM provider. Use --llm-provider openai.")
+        print("Extraction inductive des claims par LLM.")
+        claims_df = extract_claims_from_comments(
+            semantic_df,
+            client=client,
+            max_claims_per_comment=max_claims_per_comment,
+            min_confidence=claim_min_confidence,
+            limit=claim_extraction_limit,
+        )
+        claims_df.to_csv(outputs_path / "comment_claims.csv", index=False)
+        write_no_claim_summary(semantic_df, claims_df, outputs_path / "no_claim_summary.csv")
+
+    should_cluster_claims = cluster_claims or label_claim_clusters
+    if should_cluster_claims and not claims_df.empty:
+        if skip_embeddings:
+            print("Clustering des claims ignoré : embeddings désactivés (--skip-embeddings).")
+        else:
+            print(f"Clustering de {len(claims_df)} claim(s) inductif(s).")
+            claim_embeddings = compute_embeddings(claims_df["claim_text"].fillna("").tolist(), model_name=embedding_model)
+            claims_df, claim_clusters_df = cluster_extracted_claims(
+                claims_df,
+                claim_embeddings,
+                min_cluster_size=claim_cluster_min_size,
+                distance_threshold=claim_cluster_distance_threshold,
+                outputs_dir=outputs_path,
+            )
+    elif should_extract_claims:
+        claim_clusters_df.to_csv(outputs_path / "claim_clusters.csv", index=False)
+
+    if label_claim_clusters:
+        label_client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key)
+        labels = label_extracted_claim_clusters(claim_clusters_df, client=label_client)
+        claim_cluster_labels_path = write_claim_cluster_labels(labels, outputs_path / "claim_cluster_labels.md")
+
     dashboard_path = build_dashboard(
         semantic_df,
         metadata_df,
@@ -1913,6 +1970,9 @@ def run_pipeline(
         "clusters_df": clusters_df,
         "trajectories_df": trajectories_df,
         "reception_df": reception_df,
+        "claims_df": claims_df,
+        "claim_clusters_df": claim_clusters_df,
+        "claim_cluster_labels_path": claim_cluster_labels_path,
         "embeddings": embeddings,
         "dashboard_path": dashboard_path,
         "interpretation_note_path": note_path,
@@ -1952,6 +2012,17 @@ def parse_args() -> argparse.Namespace:
         default=8,
         help="Nombre minimal de tokens informatifs pour inclure un commentaire dans les embeddings/clusters.",
     )
+    parser.add_argument("--extract-claims", action="store_true", help="Extraire des claims inductifs par LLM.")
+    parser.add_argument("--cluster-claims", action="store_true", help="Clusteriser les claims extraits.")
+    parser.add_argument("--label-claim-clusters", action="store_true", help="Nommer les clusters de claims.")
+    parser.add_argument("--llm-provider", default="openai", help="Provider LLM : openai ou none.")
+    parser.add_argument("--llm-model", default="gpt-4.1-mini", help="Modèle LLM pour extraction/labeling.")
+    parser.add_argument("--llm-api-key", default=None, help="Clé API LLM. Sinon OPENAI_API_KEY.")
+    parser.add_argument("--max-claims-per-comment", type=int, default=3)
+    parser.add_argument("--claim-min-confidence", type=float, default=0.65)
+    parser.add_argument("--claim-extraction-limit", type=int, default=None)
+    parser.add_argument("--claim-cluster-min-size", type=int, default=8)
+    parser.add_argument("--claim-cluster-distance-threshold", type=float, default=0.35)
     return parser.parse_args()
 
 
@@ -1971,6 +2042,17 @@ def main() -> None:
         skip_embeddings=args.skip_embeddings,
         min_cluster_chars=args.min_cluster_chars,
         min_cluster_meaningful_tokens=args.min_cluster_meaningful_tokens,
+        extract_claims=args.extract_claims,
+        cluster_claims=args.cluster_claims,
+        label_claim_clusters=args.label_claim_clusters,
+        llm_provider=args.llm_provider,
+        llm_model=args.llm_model,
+        llm_api_key=args.llm_api_key,
+        max_claims_per_comment=args.max_claims_per_comment,
+        claim_min_confidence=args.claim_min_confidence,
+        claim_extraction_limit=args.claim_extraction_limit,
+        claim_cluster_min_size=args.claim_cluster_min_size,
+        claim_cluster_distance_threshold=args.claim_cluster_distance_threshold,
     )
     print("\nExports générés :")
     print(" - data/youtube_comments_raw_anonymized.csv")
@@ -1981,6 +2063,11 @@ def main() -> None:
     print(" - outputs/semantic_clusters.csv")
     print(" - outputs/semantic_filter_summary.csv")
     print(" - outputs/reception_distance_by_video.csv")
+    if args.extract_claims or args.cluster_claims or args.label_claim_clusters:
+        print(" - outputs/comment_claims.csv")
+        print(" - outputs/no_claim_summary.csv")
+        print(" - outputs/claim_clusters.csv")
+        print(" - outputs/claim_cluster_labels.md")
     print(f" - {result['dashboard_path']}")
     print(f" - {result['interpretation_note_path']}")
 
