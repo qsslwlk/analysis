@@ -29,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-provider", default="openai")
     parser.add_argument("--llm-model", default="gpt-4.1-mini")
     parser.add_argument("--llm-api-key", default=None)
+    parser.add_argument("--llm-base-url", default=None)
     parser.add_argument("--max-claims-per-comment", type=int, default=3)
     parser.add_argument("--claim-min-confidence", type=float, default=0.65)
     parser.add_argument("--claim-extraction-limit", type=int, default=None)
@@ -61,6 +62,7 @@ def main() -> None:
         llm_provider=args.llm_provider,
         llm_model=args.llm_model,
         llm_api_key=args.llm_api_key,
+        llm_base_url=args.llm_base_url,
         max_claims_per_comment=args.max_claims_per_comment,
         claim_min_confidence=args.claim_min_confidence,
         claim_extraction_limit=args.claim_extraction_limit,

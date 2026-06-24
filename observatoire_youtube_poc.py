@@ -1785,6 +1785,7 @@ def run_pipeline(
     llm_provider: str = "openai",
     llm_model: str = "gpt-4.1-mini",
     llm_api_key: Optional[str] = None,
+    llm_base_url: Optional[str] = None,
     max_claims_per_comment: int = 3,
     claim_min_confidence: float = 0.65,
     claim_extraction_limit: Optional[int] = None,
@@ -1907,9 +1908,9 @@ def run_pipeline(
 
     should_extract_claims = extract_claims or cluster_claims or label_claim_clusters
     if should_extract_claims:
-        client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key)
+        client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key, base_url=llm_base_url)
         if client is None:
-            raise RuntimeError("Claim extraction requires an LLM provider. Use --llm-provider openai.")
+            raise RuntimeError("Claim extraction requires an LLM provider. Use --llm-provider openai or ollama.")
         print("Extraction inductive des claims par LLM.")
         claims_df = extract_claims_from_comments(
             semantic_df,
@@ -1939,7 +1940,7 @@ def run_pipeline(
         claim_clusters_df.to_csv(outputs_path / "claim_clusters.csv", index=False)
 
     if label_claim_clusters:
-        label_client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key)
+        label_client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key, base_url=llm_base_url)
         labels = label_extracted_claim_clusters(claim_clusters_df, client=label_client)
         claim_cluster_labels_path = write_claim_cluster_labels(labels, outputs_path / "claim_cluster_labels.md")
 
@@ -2015,9 +2016,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--extract-claims", action="store_true", help="Extraire des claims inductifs par LLM.")
     parser.add_argument("--cluster-claims", action="store_true", help="Clusteriser les claims extraits.")
     parser.add_argument("--label-claim-clusters", action="store_true", help="Nommer les clusters de claims.")
-    parser.add_argument("--llm-provider", default="openai", help="Provider LLM : openai ou none.")
+    parser.add_argument("--llm-provider", default="openai", help="Provider LLM : openai, ollama ou none.")
     parser.add_argument("--llm-model", default="gpt-4.1-mini", help="Modèle LLM pour extraction/labeling.")
     parser.add_argument("--llm-api-key", default=None, help="Clé API LLM. Sinon OPENAI_API_KEY.")
+    parser.add_argument("--llm-base-url", default=None, help="Base URL LLM. Ollama par défaut : http://localhost:11434.")
     parser.add_argument("--max-claims-per-comment", type=int, default=3)
     parser.add_argument("--claim-min-confidence", type=float, default=0.65)
     parser.add_argument("--claim-extraction-limit", type=int, default=None)
@@ -2048,6 +2050,7 @@ def main() -> None:
         llm_provider=args.llm_provider,
         llm_model=args.llm_model,
         llm_api_key=args.llm_api_key,
+        llm_base_url=args.llm_base_url,
         max_claims_per_comment=args.max_claims_per_comment,
         claim_min_confidence=args.claim_min_confidence,
         claim_extraction_limit=args.claim_extraction_limit,

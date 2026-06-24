@@ -42,6 +42,23 @@ python -m observatoire.cli \
   --label-claim-clusters
 ```
 
+Elle peut aussi utiliser un modèle open source local via Ollama :
+
+```bash
+ollama pull llama3.1:8b
+ollama serve
+
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-claims \
+  --cluster-claims \
+  --label-claim-clusters \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b
+```
+
+Si Ollama tourne ailleurs que sur `http://localhost:11434`, utilisez `--llm-base-url` ou `OLLAMA_BASE_URL`.
+
 ## Structure générée
 
 ```text
@@ -196,7 +213,7 @@ Erreurs gérées explicitement :
 - Matrices `acteur × cadrage`, `semaine × cadrage`, `vidéo × cadrage`.
 - Embeddings multilingues avec `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`.
 - Filtrage des commentaires trop courts, emoji-only ou réactionnels avant clustering sémantique.
-- Extraction inductive optionnelle de claims par LLM, avec preuve textuelle obligatoire.
+- Extraction inductive optionnelle de claims par LLM OpenAI ou Ollama, avec preuve textuelle obligatoire.
 - Clustering optionnel des claims plutôt que des commentaires bruts.
 - Réduction 2D par PCA, UMAP si disponible.
 - Clustering KMeans robuste pour petit volume.

@@ -51,6 +51,27 @@ python -m observatoire.cli \
   --label-claim-clusters
 ```
 
+Provider LLM :
+
+- `--llm-provider openai` utilise l'API OpenAI ou une API compatible via `--llm-base-url`.
+- `--llm-provider ollama` utilise Ollama local sur `http://localhost:11434` par défaut.
+- `--llm-provider olama` est accepté comme alias tolérant pour la faute de frappe fréquente.
+
+Exemple Ollama :
+
+```bash
+ollama pull llama3.1:8b
+ollama serve
+
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-claims \
+  --cluster-claims \
+  --label-claim-clusters \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b
+```
+
 Outputs :
 
 - `outputs/comment_claims.csv` : claims extraits, preuve textuelle, confiance, commentaire source.
