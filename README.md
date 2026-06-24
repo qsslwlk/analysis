@@ -2,7 +2,7 @@
 
 POC exécutable dans Google Colab ou en local pour collecter des commentaires publics via l’API officielle **YouTube Data API v3**, les anonymiser, puis produire une analyse agrégée des cadrages politiques observables dans les conversations.
 
-Ce projet ne sert pas au microciblage politique, au scoring individuel ni à la persuasion personnalisée. Il produit uniquement des agrégats : thèmes, cadrages, clusters sémantiques, trajectoires et distances de réception.
+Ce projet produit uniquement des agrégats : thèmes, cadrages, clusters sémantiques, trajectoires et distances de réception.
 
 ## Structure V2
 
