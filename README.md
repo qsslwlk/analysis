@@ -59,6 +59,18 @@ python -m observatoire.cli \
 
 Si Ollama tourne ailleurs que sur `http://localhost:11434`, utilisez `--llm-base-url` ou `OLLAMA_BASE_URL`.
 
+La V2.6.1 ajoute l'option 1 de cartographie discursive : une fiche structurée par verbatim, produite par LLM sans fine-tuning, puis clusterisée.
+
+```bash
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-discourse-cards \
+  --cluster-discourse-cards \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b \
+  --discursive-card-limit 50
+```
+
 ## Structure générée
 
 ```text
@@ -77,6 +89,9 @@ Si Ollama tourne ailleurs que sur `http://localhost:11434`, utilisez `--llm-base
     ├── frame_time_series.csv
     ├── semantic_clusters.csv
     ├── semantic_filter_summary.csv
+    ├── discursive_cards.csv
+    ├── discursive_card_coverage.csv
+    ├── discursive_clusters.csv
     ├── comment_claims.csv
     ├── no_claim_summary.csv
     ├── claim_clusters.csv
@@ -213,6 +228,8 @@ Erreurs gérées explicitement :
 - Matrices `acteur × cadrage`, `semaine × cadrage`, `vidéo × cadrage`.
 - Embeddings multilingues avec `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`.
 - Filtrage des commentaires trop courts, emoji-only ou réactionnels avant clustering sémantique.
+- Fiches discursives structurées optionnelles par LLM : thème, cadrage, stance, argument, tonalité, ambiguïtés et citations.
+- Clustering optionnel des fiches discursives pour cartographier des proximités de discours sans fine-tuning.
 - Extraction inductive optionnelle de claims par LLM OpenAI ou Ollama, avec preuve textuelle obligatoire.
 - Clustering optionnel des claims plutôt que des commentaires bruts.
 - Réduction 2D par PCA, UMAP si disponible.

@@ -81,6 +81,30 @@ Outputs :
 
 Le clustering de claims utilise HDBSCAN si disponible, puis un fallback hiérarchique. Les petits groupes sont laissés en bruit (`claim_cluster = -1`) au lieu d'être forcés dans une famille artificielle.
 
+## Fiches Discursives V2.6.1
+
+La V2.6.1 implémente l'option 1 décrite dans `docs/V2_6_OPTIONS_CARTOGRAPHIE_DISCOURS.md` : annotation structurée par LLM généraliste, sans fine-tuning. Chaque commentaire candidat peut produire une fiche discursive avec thème principal, sous-thèmes, cadrage dominant, cadrages secondaires, stances par cible, argument central, type d'argument, objection éventuelle, tonalité, ambiguïtés, citations et niveau de confiance.
+
+Commande type :
+
+```bash
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-discourse-cards \
+  --cluster-discourse-cards \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b \
+  --discursive-card-limit 50
+```
+
+Outputs :
+
+- `outputs/discursive_cards.csv` : fiches discursives ancrées dans des citations du verbatim.
+- `outputs/discursive_card_coverage.csv` : candidats avec ou sans fiche exploitable.
+- `outputs/discursive_clusters.csv` : familles de fiches regroupées par embeddings de résumé discursif.
+
+Cette couche ne remplace pas les claims V2.5. Les claims restent utiles pour isoler des assertions courtes ; les fiches discursives sont plus larges et préservent davantage de nuance.
+
 ## Prochaines Étapes
 
 - Déplacer progressivement les fonctions de `observatoire_youtube_poc.py` vers `collectors/`, `processing/`, `frames/`, `models/` et `reports/`.

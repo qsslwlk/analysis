@@ -2,8 +2,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
+from observatoire.claim_clustering import cluster_claims
 from observatoire.claim_labeling import label_claim_clusters, write_claim_cluster_labels
 from observatoire.claims import extract_claims_from_comments, write_no_claim_summary
 
@@ -95,7 +97,48 @@ class ClaimsTest(unittest.TestCase):
 
         self.assertIn("financement / prix", text)
 
+    def test_claim_clustering_handles_all_noise(self):
+        claims = pd.DataFrame(
+            [
+                {
+                    "claim_id": "c1::1",
+                    "comment_id": "c1",
+                    "actor": "LFI",
+                    "claim_text": "Le financement du blocage des prix est jugé flou.",
+                    "confidence": 0.8,
+                },
+                {
+                    "claim_id": "c2::1",
+                    "comment_id": "c2",
+                    "actor": "RN",
+                    "claim_text": "La baisse de TVA est présentée comme prioritaire.",
+                    "confidence": 0.82,
+                },
+                {
+                    "claim_id": "c3::1",
+                    "comment_id": "c3",
+                    "actor": "LFI",
+                    "claim_text": "Les salaires devraient augmenter davantage.",
+                    "confidence": 0.9,
+                },
+            ]
+        )
+        embeddings = np.eye(len(claims))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            claims_out, clusters_out = cluster_claims(
+                claims,
+                embeddings,
+                min_cluster_size=8,
+                outputs_dir=tmp,
+            )
+            exported_clusters = pd.read_csv(Path(tmp) / "claim_clusters.csv")
+
+        self.assertTrue(clusters_out.empty)
+        self.assertIn("size", clusters_out.columns)
+        self.assertEqual(set(claims_out["claim_cluster"]), {-1})
+        self.assertIn("size", exported_clusters.columns)
+
 
 if __name__ == "__main__":
     unittest.main()
-
