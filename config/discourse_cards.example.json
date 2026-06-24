@@ -1,0 +1,11 @@
+{
+  "extract_discourse_cards": true,
+  "cluster_discourse_cards": true,
+  "llm_provider": "ollama",
+  "llm_model": "llama3.1:8b",
+  "llm_base_url": "http://localhost:11434",
+  "discursive_card_min_confidence": 0.55,
+  "discursive_card_limit": 50,
+  "discursive_cluster_min_size": 6,
+  "discursive_cluster_distance_threshold": 0.35
+}

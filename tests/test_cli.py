@@ -14,8 +14,9 @@ class CliTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         self.assertIn("--config", result.stdout)
+        self.assertIn("--extract-discourse-cards", result.stdout)
+        self.assertIn("--cluster-discourse-cards", result.stdout)
 
 
 if __name__ == "__main__":
     unittest.main()
-

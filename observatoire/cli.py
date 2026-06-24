@@ -23,6 +23,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-embeddings", action="store_true")
     parser.add_argument("--min-cluster-chars", type=int, default=80)
     parser.add_argument("--min-cluster-meaningful-tokens", type=int, default=8)
+    parser.add_argument("--extract-discourse-cards", action="store_true")
+    parser.add_argument("--cluster-discourse-cards", action="store_true")
     parser.add_argument("--extract-claims", action="store_true")
     parser.add_argument("--cluster-claims", action="store_true")
     parser.add_argument("--label-claim-clusters", action="store_true")
@@ -35,6 +37,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--claim-extraction-limit", type=int, default=None)
     parser.add_argument("--claim-cluster-min-size", type=int, default=8)
     parser.add_argument("--claim-cluster-distance-threshold", type=float, default=0.35)
+    parser.add_argument("--discursive-card-min-confidence", type=float, default=0.55)
+    parser.add_argument("--discursive-card-limit", type=int, default=None)
+    parser.add_argument("--discursive-cluster-min-size", type=int, default=6)
+    parser.add_argument("--discursive-cluster-distance-threshold", type=float, default=0.35)
     return parser.parse_args()
 
 
@@ -56,6 +62,8 @@ def main() -> None:
         skip_embeddings=args.skip_embeddings,
         min_cluster_chars=args.min_cluster_chars,
         min_cluster_meaningful_tokens=args.min_cluster_meaningful_tokens,
+        extract_discourse_cards=args.extract_discourse_cards,
+        cluster_discourse_cards=args.cluster_discourse_cards,
         extract_claims=args.extract_claims,
         cluster_claims=args.cluster_claims,
         label_claim_clusters=args.label_claim_clusters,
@@ -68,6 +76,10 @@ def main() -> None:
         claim_extraction_limit=args.claim_extraction_limit,
         claim_cluster_min_size=args.claim_cluster_min_size,
         claim_cluster_distance_threshold=args.claim_cluster_distance_threshold,
+        discursive_card_min_confidence=args.discursive_card_min_confidence,
+        discursive_card_limit=args.discursive_card_limit,
+        discursive_cluster_min_size=args.discursive_cluster_min_size,
+        discursive_cluster_distance_threshold=args.discursive_cluster_distance_threshold,
     )
     print("\nExports générés :")
     for key in ["dashboard_path", "interpretation_note_path"]:
