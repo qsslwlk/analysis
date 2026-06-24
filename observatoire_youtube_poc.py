@@ -42,6 +42,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import cosine_distances
 
+from observatoire.cache import DatasetCache, build_raw_cache_context
+from observatoire.config import load_video_config
+from observatoire.privacy import assert_privacy_safe_columns
+
 
 VIDEOS = [
     {
@@ -1728,17 +1732,29 @@ Une distance élevée entre le titre de la vidéo et le commentaire moyen peut i
     return output
 
 
-def read_cached_dataset(data_dir: Path, requested_video_ids: Sequence[str]) -> Optional[Tuple[pd.DataFrame, pd.DataFrame]]:
+def read_cached_dataset(
+    data_dir: Path,
+    requested_video_ids: Sequence[str],
+    cache_context: Optional[Dict[str, Any]] = None,
+) -> Optional[Tuple[pd.DataFrame, pd.DataFrame]]:
     comments_path = data_dir / "youtube_comments_raw_anonymized.csv"
     metadata_path = data_dir / "video_metadata.csv"
     if not comments_path.exists() or not metadata_path.exists():
+        return None
+
+    if cache_context is not None:
+        cached = DatasetCache(data_dir).read(cache_context)
+        if cached is not None:
+            print("Cache manifesté détecté : réutilisation des fichiers data/*.csv.")
+            return cached
+        print("Cache présent mais paramètres différents ou manifeste absent : nouvelle collecte.")
         return None
 
     comments_df = pd.read_csv(comments_path)
     metadata_df = pd.read_csv(metadata_path)
     cached_ids = set(metadata_df.get("video_id", pd.Series(dtype=str)).dropna().astype(str))
     if set(requested_video_ids).issubset(cached_ids):
-        print("Cache détecté : réutilisation des fichiers data/*.csv.")
+        print("Cache legacy détecté : réutilisation des fichiers data/*.csv.")
         return comments_df, metadata_df
     print("Cache présent mais incomplet pour la liste de vidéos demandée : nouvelle collecte.")
     return None
@@ -1759,8 +1775,14 @@ def run_pipeline(
     data_path, outputs_path = ensure_dirs(data_dir, outputs_dir)
     normalized = normalize_videos(videos)
     requested_ids = [video["video_id"] for video in normalized]
+    cache_context = build_raw_cache_context(
+        requested_video_ids=requested_ids,
+        max_comments_per_video=max_comments_per_video,
+        include_replies=include_replies,
+    )
+    raw_cache = DatasetCache(data_path)
 
-    cached = None if force_refresh else read_cached_dataset(data_path, requested_ids)
+    cached = None if force_refresh else read_cached_dataset(data_path, requested_ids, cache_context)
     if cached is None:
         resolved_key = resolve_api_key(api_key)
         raw_df, metadata_df = build_dataset(
@@ -1769,12 +1791,22 @@ def run_pipeline(
             max_comments_per_video=max_comments_per_video,
             include_replies=include_replies,
         )
+        assert_privacy_safe_columns(raw_df.columns)
         raw_df.to_csv(data_path / "youtube_comments_raw_anonymized.csv", index=False)
+        assert_privacy_safe_columns(metadata_df.columns)
         metadata_df.to_csv(data_path / "video_metadata.csv", index=False)
+        raw_cache.write_manifest(
+            cache_context,
+            stats={
+                "comments_rows": int(len(raw_df)),
+                "metadata_rows": int(len(metadata_df)),
+            },
+        )
     else:
         raw_df, metadata_df = cached
 
     enriched_df = enrich_text_and_frames(raw_df)
+    assert_privacy_safe_columns(enriched_df.columns)
     enriched_df.to_csv(data_path / "youtube_comments_enriched.csv", index=False)
     frame_tables = compute_frame_tables(enriched_df, outputs_path)
 
@@ -1853,16 +1885,14 @@ def run_pipeline(
 
 def load_videos_from_json(path: Path | str) -> List[Dict[str, Any]]:
     """Load a custom VIDEOS list from a JSON file."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not isinstance(data, list):
-        raise ValueError("Le fichier JSON doit contenir une liste d'objets vidéos.")
-    return data
+    return load_video_config(path)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="POC observatoire des cadrages YouTube.")
     parser.add_argument("--api-key", default=None, help="Clé YouTube Data API v3. Sinon YOUTUBE_API_KEY.")
     parser.add_argument("--videos-json", default=None, help="Fichier JSON contenant la liste VIDEOS.")
+    parser.add_argument("--videos-config", default=None, help="Fichier JSON/YAML contenant une clé videos ou une liste.")
     parser.add_argument("--max-comments-per-video", type=int, default=500)
     parser.add_argument("--include-replies", action="store_true", help="Collecter aussi les réponses aux commentaires.")
     parser.add_argument("--force-refresh", action="store_true", help="Ignorer le cache CSV local.")
@@ -1879,7 +1909,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    videos = load_videos_from_json(args.videos_json) if args.videos_json else VIDEOS
+    videos_config = args.videos_config or args.videos_json
+    videos = load_videos_from_json(videos_config) if videos_config else VIDEOS
     result = run_pipeline(
         videos=videos,
         api_key=args.api_key,

@@ -2,7 +2,34 @@
 
 POC exécutable dans Google Colab ou en local pour collecter des commentaires publics via l’API officielle **YouTube Data API v3**, les anonymiser, puis produire une analyse agrégée des cadrages politiques observables dans les conversations.
 
-Ce projet ne sert pas au microciblage politique, au scoring individuel ni à la persuasion personnalisée. Il produit uniquement des agrégats : thèmes, cadrages, clusters sémantiques, trajectoires et distances de réception.
+Ce projet produit uniquement des agrégats : thèmes, cadrages, clusters sémantiques, trajectoires et distances de réception.
+
+## Structure V2
+
+La V2 conserve le script POC historique et ajoute un petit package `observatoire/` pour rendre le pipeline plus robuste :
+
+```text
+.
+├── observatoire_youtube_poc.py
+├── observatoire/
+│   ├── cache.py
+│   ├── cli.py
+│   ├── config.py
+│   ├── privacy.py
+│   └── schemas.py
+├── config/
+│   ├── corpus.example.json
+│   └── frames.example.json
+├── docs/
+│   └── V2_ARCHITECTURE.md
+└── tests/
+```
+
+Le script `observatoire_youtube_poc.py` reste exécutable comme avant. L'entrée V2 recommandée est :
+
+```bash
+python -m observatoire.cli --config config/corpus.example.json --max-comments-per-video 100
+```
 
 ## Structure générée
 
@@ -15,7 +42,8 @@ Ce projet ne sert pas au microciblage politique, au scoring individuel ni à la 
 ├── data/
 │   ├── youtube_comments_raw_anonymized.csv
 │   ├── youtube_comments_enriched.csv
-│   └── video_metadata.csv
+│   ├── video_metadata.csv
+│   └── raw_collection_manifest.json
 └── outputs/
     ├── frame_actor_matrix.csv
     ├── frame_time_series.csv
@@ -64,7 +92,14 @@ python observatoire_youtube_poc.py --max-comments-per-video 500
 
 ## Modifier la liste des vidéos
 
-Dans `observatoire_youtube_poc.py` ou dans le notebook, modifier la variable `VIDEOS`.
+Option V2 recommandée : copier `config/corpus.example.json`, puis lancer le pipeline avec `--config` ou `--videos-config`.
+
+```bash
+python -m observatoire.cli --config config/corpus.example.json
+python observatoire_youtube_poc.py --videos-config config/corpus.example.json
+```
+
+Option POC historique : modifier la variable `VIDEOS` dans `observatoire_youtube_poc.py` ou dans le notebook.
 
 Chaque entrée accepte :
 
@@ -106,10 +141,10 @@ Ignorer le cache et rappeler l’API :
 python observatoire_youtube_poc.py --force-refresh
 ```
 
-Utiliser une liste externe :
+Utiliser une liste externe JSON/YAML :
 
 ```bash
-python observatoire_youtube_poc.py --videos-json videos.json
+python observatoire_youtube_poc.py --videos-config videos.json
 ```
 
 ## Cache et quotas
@@ -118,8 +153,9 @@ Le POC écrit un cache local :
 
 - `data/youtube_comments_raw_anonymized.csv`
 - `data/video_metadata.csv`
+- `data/raw_collection_manifest.json`
 
-Si ces fichiers couvrent déjà les vidéos demandées, le script les réutilise pour éviter de consommer inutilement le quota YouTube.
+Le manifeste encode la liste des vidéos, `max_comments_per_video`, `include_replies` et le collecteur. Si ces paramètres changent, le script relance la collecte au lieu de réutiliser silencieusement un cache incompatible.
 
 La collecte est limitée par défaut à `500` commentaires par vidéo. Vous pouvez réduire cette limite pendant les tests :
 
@@ -190,7 +226,16 @@ Elle ne doit pas être reformulée en :
 
 Ce garde-fou est important : les données collectées ne mesurent ni l’électorat, ni l’opinion publique, ni les audiences complètes des chaînes.
 
-## V2 possible
+## Suite V2
+
+Socle posé :
+
+- Configuration externe du corpus et des lexiques.
+- Cache manifesté pour éviter les réutilisations incohérentes.
+- Contrôle simple des colonnes sensibles avant export.
+- Tests unitaires sur config, cache et privacy.
+
+Prochaines extensions :
 
 - BERTopic pour des topics plus lisibles.
 - HDBSCAN pour des clusters de densité sans fixer `k`.
