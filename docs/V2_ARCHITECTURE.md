@@ -37,6 +37,8 @@ Les commentaires restent tous présents dans `data/youtube_comments_enriched.csv
 
 Les seuils peuvent être ajustés avec `--min-cluster-chars` et `--min-cluster-meaningful-tokens`. Le fichier `outputs/semantic_filter_summary.csv` résume les exclusions par raison.
 
+Le seuil `--semantic-cluster-min-size` évite de présenter comme clusters robustes des groupes trop petits. Avec un run de test du type `--max-comments-per-video 10`, il est normal que `outputs/semantic_clusters.csv` soit vide ou très réduit : le volume est insuffisant pour une cartographie stable.
+
 ## Claims Inductifs V2.5
 
 La V2.5 ajoute une couche optionnelle entre les commentaires et les clusters. Le LLM ne choisit pas dans une liste de claims possibles ; il extrait librement des claims courts, mais chaque claim doit être soutenu par une preuve textuelle dans le commentaire.
@@ -80,6 +82,8 @@ Outputs :
 - `outputs/claim_cluster_labels.md` : labels interprétables des familles de claims.
 
 Le clustering de claims utilise HDBSCAN si disponible, puis un fallback hiérarchique. Les petits groupes sont laissés en bruit (`claim_cluster = -1`) au lieu d'être forcés dans une famille artificielle.
+
+Par défaut, `--max-claims-per-comment` vaut `1` afin d'éviter la fragmentation en micro-claims sur des commentaires courts. Pour une analyse plus exhaustive, il peut être augmenté explicitement.
 
 ## Fiches Discursives V2.6.1
 

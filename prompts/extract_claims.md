@@ -2,10 +2,13 @@ Tu extrais des claims inductifs depuis des commentaires YouTube politiques.
 
 Règles :
 - Ne choisis pas dans une taxonomie prédéfinie.
-- Retourne uniquement des assertions, objections, interprétations ou demandes explicitement soutenues par le commentaire.
+- Retourne uniquement des assertions, objections, interprétations ou demandes substantielles explicitement soutenues par le commentaire.
 - Un claim doit être proche du texte, mais reformulé de façon sobre et comparable.
 - Chaque claim doit avoir une preuve textuelle courte dans `evidence`.
 - Si le commentaire ne contient pas de claim clair, retourne `{"claims": []}`.
+- Ne transforme pas un simple remerciement, encouragement, slogan, appel au vote ou soutien nominal en claim.
+- Ne retourne pas de claim du type "X a du soutien" si le commentaire ne porte pas une idée argumentative plus précise.
+- Préfère 0 ou 1 claim par commentaire. Ne sépare plusieurs claims que s'ils sont vraiment distincts et substantiels.
 - Ne déduis pas l'opinion générale, l'intention individuelle ou un profil politique.
 - Retourne au plus le nombre de claims demandé.
 
@@ -20,4 +23,3 @@ Format JSON obligatoire :
     }
   ]
 }
-

@@ -1106,6 +1106,19 @@ def choose_cluster_count(n_comments: int, max_clusters: int = 8) -> int:
     return int(min(max_clusters, max(2, round(math.sqrt(n_comments / 2)))))
 
 
+SEMANTIC_CLUSTER_COLUMNS = [
+    "semantic_cluster",
+    "size",
+    "share",
+    "top_terms",
+    "label_auto",
+    "dominant_actor",
+    "actor_distribution_json",
+    "top_videos_json",
+    "examples_json",
+]
+
+
 def _top_tfidf_terms(texts: Sequence[str], n_terms: int = 8) -> List[str]:
     if not texts:
         return []
@@ -1132,6 +1145,7 @@ def cluster_embeddings(
     enriched_df: pd.DataFrame,
     embeddings: np.ndarray,
     max_clusters: int = 8,
+    min_cluster_size: int = 8,
     reduction_method: str = "pca",
     random_state: int = 42,
     outputs_dir: Path | str = "outputs",
@@ -1142,7 +1156,7 @@ def cluster_embeddings(
     df = enriched_df.copy().reset_index(drop=True)
 
     if df.empty or embeddings.size == 0:
-        empty = pd.DataFrame()
+        empty = pd.DataFrame(columns=SEMANTIC_CLUSTER_COLUMNS)
         empty.to_csv(outputs_path / "semantic_clusters.csv", index=False)
         return df, empty, np.empty((0, 2))
 
@@ -1155,10 +1169,12 @@ def cluster_embeddings(
         labels = np.zeros(len(df), dtype=int)
     else:
         labels = KMeans(n_clusters=n_clusters, n_init="auto", random_state=random_state).fit_predict(embeddings)
+    counts = pd.Series(labels).value_counts()
+    labels = np.array([label if counts[label] >= min_cluster_size else -1 for label in labels], dtype=int)
     df["semantic_cluster"] = labels
 
     cluster_rows = []
-    for cluster_id in sorted(df["semantic_cluster"].unique()):
+    for cluster_id in sorted(label for label in df["semantic_cluster"].unique() if label != -1):
         mask = df["semantic_cluster"] == cluster_id
         cluster_df = df.loc[mask].copy()
         cluster_embeddings_matrix = embeddings[mask.to_numpy()]
@@ -1192,7 +1208,7 @@ def cluster_embeddings(
             }
         )
 
-    clusters_df = pd.DataFrame(cluster_rows).sort_values("size", ascending=False)
+    clusters_df = pd.DataFrame(cluster_rows, columns=SEMANTIC_CLUSTER_COLUMNS).sort_values("size", ascending=False)
     clusters_df.to_csv(outputs_path / "semantic_clusters.csv", index=False)
     return df, clusters_df, reduced
 
@@ -1781,6 +1797,7 @@ def run_pipeline(
     skip_embeddings: bool = False,
     min_cluster_chars: int = 80,
     min_cluster_meaningful_tokens: int = 8,
+    semantic_cluster_min_size: int = 8,
     extract_discourse_cards: bool = False,
     cluster_discourse_cards: bool = False,
     extract_claims: bool = False,
@@ -1790,7 +1807,7 @@ def run_pipeline(
     llm_model: str = "gpt-4.1-mini",
     llm_api_key: Optional[str] = None,
     llm_base_url: Optional[str] = None,
-    max_claims_per_comment: int = 3,
+    max_claims_per_comment: int = 1,
     claim_min_confidence: float = 0.65,
     claim_extraction_limit: Optional[int] = None,
     claim_cluster_min_size: int = 8,
@@ -1892,6 +1909,7 @@ def run_pipeline(
         semantic_subset, clusters_df, _ = cluster_embeddings(
             semantic_df.loc[non_empty_mask].reset_index(drop=True),
             embeddings_subset,
+            min_cluster_size=semantic_cluster_min_size,
             outputs_dir=outputs_path,
         )
         semantic_df = semantic_df.copy()
@@ -2064,6 +2082,12 @@ def parse_args() -> argparse.Namespace:
         default=8,
         help="Nombre minimal de tokens informatifs pour inclure un commentaire dans les embeddings/clusters.",
     )
+    parser.add_argument(
+        "--semantic-cluster-min-size",
+        type=int,
+        default=8,
+        help="Taille minimale d'un cluster sémantique conservé ; les groupes plus petits restent en bruit.",
+    )
     parser.add_argument("--extract-discourse-cards", action="store_true", help="Extraire des fiches discursives V2.6.1 par LLM.")
     parser.add_argument("--cluster-discourse-cards", action="store_true", help="Clusteriser les fiches discursives V2.6.1.")
     parser.add_argument("--extract-claims", action="store_true", help="Extraire des claims inductifs par LLM.")
@@ -2073,7 +2097,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--llm-model", default="gpt-4.1-mini", help="Modèle LLM pour extraction/labeling.")
     parser.add_argument("--llm-api-key", default=None, help="Clé API LLM. Sinon OPENAI_API_KEY.")
     parser.add_argument("--llm-base-url", default=None, help="Base URL LLM. Ollama par défaut : http://localhost:11434.")
-    parser.add_argument("--max-claims-per-comment", type=int, default=3)
+    parser.add_argument("--max-claims-per-comment", type=int, default=1)
     parser.add_argument("--claim-min-confidence", type=float, default=0.65)
     parser.add_argument("--claim-extraction-limit", type=int, default=None)
     parser.add_argument("--claim-cluster-min-size", type=int, default=8)
@@ -2101,6 +2125,7 @@ def main() -> None:
         skip_embeddings=args.skip_embeddings,
         min_cluster_chars=args.min_cluster_chars,
         min_cluster_meaningful_tokens=args.min_cluster_meaningful_tokens,
+        semantic_cluster_min_size=args.semantic_cluster_min_size,
         extract_discourse_cards=args.extract_discourse_cards,
         cluster_discourse_cards=args.cluster_discourse_cards,
         extract_claims=args.extract_claims,
