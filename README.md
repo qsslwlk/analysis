@@ -137,32 +137,11 @@ Voir `docs/LLM_ANNOTATION_SPEED.md` pour les stratégies de vitesse, les comprom
 
 Pour un petit corpus, les communautés peuvent rester vides. Pour explorer seulement, abaissez `--discourse-graph-min-community-size` ou `--discourse-graph-similarity-threshold`.
 
-Visualisation interactive du graphe complet, colorée par source :
-
-```bash
-python scripts/visualize_discursive_graph.py --outputs-dir outputs
-```
-
-La taille des nœuds est proportionnelle au degré. Pour accentuer cet effet :
-
-```bash
-python scripts/visualize_discursive_graph.py \
-  --outputs-dir outputs \
-  --node-size-scale 6 \
-  --node-size-max-bonus 48
-```
-
-Le script produit :
-
-- `outputs/discursive_full_graph_by_source.html` : graphe complet des nœuds et relations discursives.
-- `outputs/discursive_filtered_graph_by_source.html` : version filtrée, utile pour retirer les hubs trop génériques.
-- `outputs/discursive_comment_projection_by_source.html` : projection commentaire-commentaire si des arêtes de similarité existent.
-
 ### Post-traitement sans ré-encodage
 
-Deux scripts permettent d'itérer sur les sorties V2.6.3 sans relancer le LLM ni recalculer les embeddings. La documentation complète est dans `docs/GRAPH_POSTPROCESSING.md`.
+Les scripts conservés dans `scripts/` couvrent uniquement les graphes, rapports et remappings utiles sans relancer le LLM. La documentation complète est dans `docs/GRAPH_POSTPROCESSING.md`.
 
-Post-traiter le graphe discursif et recalculer une projection commentaire-commentaire plus filtrée :
+Post-traiter le graphe discursif, générer les exports GEXF/HTML et recalculer une projection commentaire-commentaire filtrée :
 
 ```bash
 python scripts/postprocess_discursive_graph.py \
@@ -193,6 +172,13 @@ python scripts/generate_bridge_report.py \
 ```
 
 Ces scripts produisent des CSV d'audit, des diagnostics JSON, des exports GEXF et des HTML autonomes. Ils filtrent les labels vagues comme `other`/`unknown`, pénalisent les attributs trop fréquents et utilisent des tailles de nœuds dépendantes du degré ou du score de pont.
+
+Scripts maintenus :
+
+- `scripts/postprocess_discursive_graph.py` : graphe global, projection commentaire-commentaire, communautés post-traitées, diagnostics et HTML/GEXF.
+- `scripts/visualize_rn_lfi_bridges.py` : sous-graphe des ponts entre deux sources, par défaut RN/LFI.
+- `scripts/generate_bridge_report.py` : rapport lisible et auditable des ponts.
+- `scripts/taxonomy_induction.py` : propositions de remapping taxonomique et rapport avant/après.
 
 ### Taxonomy induction and remapping
 
@@ -264,9 +250,6 @@ Après validation humaine de la table de remapping, relancez les scripts de post
     ├── discursive_similarity_edges.csv
     ├── discursive_communities.csv
     ├── discursive_community_profiles.md
-    ├── discursive_full_graph_by_source.html
-    ├── discursive_filtered_graph_by_source.html
-    ├── discursive_comment_projection_by_source.html
     ├── graph_postprocess/
     │   ├── postprocessed_comment_communities.csv
     │   ├── postprocessed_community_summary.csv

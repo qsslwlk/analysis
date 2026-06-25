@@ -132,6 +132,13 @@ class TaxonomyInductionTest(unittest.TestCase):
             self.assertIn("Taux de `other` avant/après", report)
             self.assertIn("Commentaires affectés", report)
 
+    def test_llm_error_payload_keeps_schema_when_model_returns_bad_json(self):
+        payload = taxonomy_induction.llm_error_payload(ValueError("bad json"))
+
+        self.assertEqual(payload["candidate_aliases"], [])
+        self.assertIn("warnings", payload)
+        self.assertIn("bad json", payload["warnings"][1])
+
 
 if __name__ == "__main__":
     unittest.main()

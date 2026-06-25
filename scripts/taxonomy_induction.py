@@ -14,6 +14,7 @@ import copy
 import json
 import math
 import re
+import sys
 import unicodedata
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -21,6 +22,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 NON_SIGNAL_LABELS = {
@@ -827,15 +833,30 @@ def induce_taxonomy_with_llm(
 ) -> Dict[str, Any]:
     """Optional LLM helper. Returns strict JSON; caller remains responsible for validation."""
     system = (
-        "Tu aides à proposer une induction contrôlée de taxonomie discursive. "
-        "Tu ne remplaces pas la taxonomie stable : tu proposes des alias, fusions, déplacements d'axe "
-        "et candidats à validation humaine. Réponds uniquement en JSON conforme au schéma demandé."
+        "Tu proposes une induction contrôlée de taxonomie discursive. "
+        "Ne remplace pas la taxonomie stable. Réponds uniquement en JSON valide, compact, sans Markdown. "
+        "Si tu hésites, ajoute une entrée dans warnings plutôt que d'inventer."
     )
+    compact_examples = {
+        field: {
+            label: values[:2]
+            for label, values in list(label_examples.items())[:25]
+        }
+        for field, label_examples in examples.items()
+    }
+    compact_taxonomy = {
+        "macro_frames": taxonomy.get("macro_frames", {}),
+        "frame_aliases": dict(list(taxonomy.get("frame_aliases", {}).items())[:80]),
+        "argument_family": taxonomy.get("argument_family", {}),
+        "tone": taxonomy.get("tone", {}),
+        "rhetorical_register": taxonomy.get("rhetorical_register", {}),
+    }
     user = json.dumps(
         {
-            "taxonomy": taxonomy,
+            "task": "Propose seulement des compléments à valider humainement.",
+            "taxonomy": compact_taxonomy,
             "observed_labels": observed_labels,
-            "examples": examples,
+            "examples": compact_examples,
             "schema": {
                 "candidate_aliases": [],
                 "candidate_new_subframes": [],
@@ -848,6 +869,20 @@ def induce_taxonomy_with_llm(
         ensure_ascii=False,
     )
     return client.complete_json(system, user)
+
+
+def llm_error_payload(error: Exception) -> Dict[str, Any]:
+    return {
+        "candidate_aliases": [],
+        "candidate_new_subframes": [],
+        "candidate_merges": [],
+        "candidate_moves": [],
+        "keep_other": [],
+        "warnings": [
+            "LLM taxonomy induction failed; heuristic outputs were still generated.",
+            f"{type(error).__name__}: {str(error)[:500]}",
+        ],
+    }
 
 
 def run_induction(args: argparse.Namespace) -> Dict[str, Path]:
@@ -894,13 +929,16 @@ def run_induction(args: argparse.Namespace) -> Dict[str, Path]:
         if client is None:
             raise RuntimeError("LLM mode requires an active LLM provider.")
         observed_labels = {
-            field: top_labels(units[field] if field in units.columns else pd.Series(dtype=str), limit=50)
+            field: top_labels(units[field] if field in units.columns else pd.Series(dtype=str), limit=25)
             for field in ANALYZED_FIELDS
         }
         example_map = defaultdict(dict)
         for proposal in proposals:
             example_map[proposal["field"]][proposal["raw_label"]] = proposal.get("examples", [])
-        llm_payload = induce_taxonomy_with_llm(taxonomy, observed_labels, example_map, client)
+        try:
+            llm_payload = induce_taxonomy_with_llm(taxonomy, observed_labels, example_map, client)
+        except Exception as exc:
+            llm_payload = llm_error_payload(exc)
 
     candidates = build_candidates_json(
         run_id=run_id,
