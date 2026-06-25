@@ -194,6 +194,47 @@ python scripts/generate_bridge_report.py \
 
 Ces scripts produisent des CSV d'audit, des diagnostics JSON, des exports GEXF et des HTML autonomes. Ils filtrent les labels vagues comme `other`/`unknown`, pénalisent les attributs trop fréquents et utilisent des tailles de nœuds dépendantes du degré ou du score de pont.
 
+### Taxonomy induction and remapping
+
+La taxonomie discursive doit rester stable, versionnée et comparable entre runs. Elle ne doit pas devenir opportuniste à chaque corpus. En revanche, les sorties existantes peuvent révéler des alias manquants, des sous-frames utiles ou des confusions d'axes (`frame` vs `tone` vs `rhetorical_register` vs `argument_family` vs `target`).
+
+Le script `scripts/taxonomy_induction.py` ajoute une couche d'induction contrôlée sans relancer l'encodage LLM complet des commentaires. Il lit les fichiers déjà produits, propose des mappings auditables, crée une taxonomie candidate et applique uniquement les remappings suffisamment sûrs dans des colonnes séparées.
+
+Commande heuristique, sans LLM :
+
+```bash
+python scripts/taxonomy_induction.py \
+  --taxonomy config/discourse_taxonomy.example.json \
+  --units outputs/discursive_units.csv \
+  --nodes outputs/discursive_nodes.csv \
+  --community-summary outputs/graph_postprocess/postprocessed_community_summary.csv \
+  --output-dir outputs/taxonomy_induction \
+  --mode heuristic
+```
+
+Commande avec suggestions LLM optionnelles :
+
+```bash
+python scripts/taxonomy_induction.py \
+  --taxonomy config/discourse_taxonomy.example.json \
+  --units outputs/discursive_units.csv \
+  --nodes outputs/discursive_nodes.csv \
+  --output-dir outputs/taxonomy_induction \
+  --mode llm \
+  --llm-provider openai \
+  --llm-model gpt-4.1-mini
+```
+
+Sorties :
+
+- `outputs/taxonomy_induction/taxonomy_induction_candidates.json` : propositions d'alias, sous-frames, déplacements d'axe et labels à garder en `other`.
+- `outputs/taxonomy_induction/taxonomy_remap_table.csv` : table de correspondance avec justification, exemples et validation humaine requise ou non.
+- `outputs/taxonomy_induction/discourse_taxonomy.candidate.json` : taxonomie candidate qui n'écrase jamais `config/discourse_taxonomy.example.json`.
+- `outputs/taxonomy_induction/discursive_units_remapped.csv` : unités remappées avec colonnes `*_raw` et `*_remapped`.
+- `outputs/taxonomy_induction/taxonomy_remap_report.md` : comparaison avant/après des taux de `other`, labels uniques et impact potentiel sur le graphe.
+
+Après validation humaine de la table de remapping, relancez les scripts de post-processing graphe sur les sorties remappées ou intégrez les alias validés dans une future version contrôlée de la taxonomie. Le principe à conserver : taxonomie stable + induction contrôlée + validation humaine + remapping sans réencodage.
+
 ## Structure générée
 
 ```text
@@ -245,6 +286,12 @@ Ces scripts produisent des CSV d'audit, des diagnostics JSON, des exports GEXF e
     │   ├── rn_lfi_bridge_graph.html
     │   ├── bridge_report.csv
     │   └── bridge_report.md
+    ├── taxonomy_induction/
+    │   ├── taxonomy_induction_candidates.json
+    │   ├── taxonomy_remap_table.csv
+    │   ├── discourse_taxonomy.candidate.json
+    │   ├── discursive_units_remapped.csv
+    │   └── taxonomy_remap_report.md
     ├── discursive_incidence_frame.npz
     ├── discursive_incidence_claim.npz
     ├── discursive_incidence_stance.npz
