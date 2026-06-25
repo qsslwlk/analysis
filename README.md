@@ -99,6 +99,27 @@ python -m observatoire.cli \
 
 Pour un petit corpus, les communautés peuvent rester vides. Pour explorer seulement, abaissez `--discourse-graph-min-community-size` ou `--discourse-graph-similarity-threshold`.
 
+Visualisation interactive du graphe complet, colorée par source :
+
+```bash
+python scripts/visualize_discursive_graph.py --outputs-dir outputs
+```
+
+La taille des nœuds est proportionnelle au degré. Pour accentuer cet effet :
+
+```bash
+python scripts/visualize_discursive_graph.py \
+  --outputs-dir outputs \
+  --node-size-scale 6 \
+  --node-size-max-bonus 48
+```
+
+Le script produit :
+
+- `outputs/discursive_full_graph_by_source.html` : graphe complet des nœuds et relations discursives.
+- `outputs/discursive_filtered_graph_by_source.html` : version filtrée, utile pour retirer les hubs trop génériques.
+- `outputs/discursive_comment_projection_by_source.html` : projection commentaire-commentaire si des arêtes de similarité existent.
+
 ## Structure générée
 
 ```text
@@ -127,6 +148,9 @@ Pour un petit corpus, les communautés peuvent rester vides. Pour explorer seule
     ├── discursive_similarity_edges.csv
     ├── discursive_communities.csv
     ├── discursive_community_profiles.md
+    ├── discursive_full_graph_by_source.html
+    ├── discursive_filtered_graph_by_source.html
+    ├── discursive_comment_projection_by_source.html
     ├── discursive_incidence_frame.npz
     ├── discursive_incidence_claim.npz
     ├── discursive_incidence_stance.npz
@@ -268,9 +292,11 @@ Erreurs gérées explicitement :
 - Filtrage des commentaires trop courts, emoji-only ou réactionnels avant clustering sémantique.
 - Garde-fou petit volume : les clusters sémantiques trop petits restent en bruit au lieu d'être forcés dans des familles artificielles.
 - Fiches discursives structurées optionnelles par LLM : thème, cadrage, stance, argument, tonalité, ambiguïtés et citations.
+- Taxonomie contrôlée des fiches discursives : `macro_frame`, `frame_primary`, stance normalisée, famille argumentative, tonalité, registre rhétorique et scores qualité.
 - Clustering optionnel des fiches discursives pour cartographier des proximités de discours sans fine-tuning.
 - Graphe discursif typé V2.6.3 : commentaires reliés à frames, claims canoniques, cibles, stances, tonalités, source vidéo et période.
 - Communautés discursives interprétables à partir d'une similarité hybride par matrices d'incidence pondérées.
+- Visualisation HTML interactive du graphe discursif complet, filtré et de la projection commentaire-commentaire.
 - Extraction inductive optionnelle de claims par LLM OpenAI ou Ollama, avec preuve textuelle obligatoire.
 - Clustering optionnel des claims plutôt que des commentaires bruts.
 - Réduction 2D par PCA, UMAP si disponible.
@@ -330,10 +356,12 @@ Socle posé :
 - Filtre de qualité sémantique avant embeddings/clusters.
 - Extraction inductive de claims et clustering de claims.
 - Fiches discursives LLM, graphe typé V2.6.3 et communautés discursives interprétables.
+- Codebook contrôlé dans `config/discourse_taxonomy.example.json` et normalisation des fiches avant graphe.
 - Tests unitaires sur config, cache et privacy.
 
 Prochaines extensions :
 
+- Ajuster empiriquement la taille des nœuds dans les visualisations en fonction du degré pour mieux faire ressortir les hubs sans écraser les petits signaux.
 - BERTopic pour des topics plus lisibles.
 - Détection de stance par modèle local ou API.
 - Annotation humaine assistée.
