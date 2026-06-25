@@ -46,6 +46,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--claim-cluster-distance-threshold", type=float, default=0.35)
     parser.add_argument("--discursive-card-min-confidence", type=float, default=0.55)
     parser.add_argument("--discursive-card-limit", type=int, default=None)
+    parser.add_argument("--discursive-card-prompt", default="prompts/extract_discursive_card.md")
+    parser.add_argument("--discursive-card-cache", default=None, help="Cache JSONL des réponses LLM pour les fiches discursives.")
+    parser.add_argument("--disable-discursive-card-cache", action="store_true", help="Désactiver le cache LLM des fiches discursives.")
+    parser.add_argument("--discursive-card-workers", type=int, default=1, help="Nombre d'appels LLM concurrents pour les fiches discursives.")
+    parser.add_argument("--reuse-discourse-cards", action="store_true", help="Réutiliser outputs/discursive_cards.csv si présent.")
     parser.add_argument("--discursive-cluster-min-size", type=int, default=6)
     parser.add_argument("--discursive-cluster-distance-threshold", type=float, default=0.35)
     parser.add_argument("--discourse-graph-min-community-size", type=int, default=4)
@@ -90,6 +95,11 @@ def main() -> None:
         claim_cluster_distance_threshold=args.claim_cluster_distance_threshold,
         discursive_card_min_confidence=args.discursive_card_min_confidence,
         discursive_card_limit=args.discursive_card_limit,
+        discursive_card_prompt=args.discursive_card_prompt,
+        discursive_card_cache=args.discursive_card_cache,
+        disable_discursive_card_cache=args.disable_discursive_card_cache,
+        discursive_card_workers=args.discursive_card_workers,
+        reuse_discourse_cards=args.reuse_discourse_cards,
         discursive_cluster_min_size=args.discursive_cluster_min_size,
         discursive_cluster_distance_threshold=args.discursive_cluster_distance_threshold,
         discourse_graph_min_community_size=args.discourse_graph_min_community_size,

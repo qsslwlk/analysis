@@ -48,7 +48,11 @@ from observatoire.claim_labeling import label_claim_clusters as label_extracted_
 from observatoire.claim_labeling import write_claim_cluster_labels
 from observatoire.claims import extract_claims_from_comments, write_no_claim_summary
 from observatoire.config import load_video_config
-from observatoire.discourse_cards import extract_discursive_cards_from_comments, write_discursive_card_coverage
+from observatoire.discourse_cards import (
+    DISCURSIVE_CARD_COLUMNS,
+    extract_discursive_cards_from_comments,
+    write_discursive_card_coverage,
+)
 from observatoire.discourse_clustering import cluster_discursive_cards, empty_discursive_clusters_df
 from observatoire.discourse_graph import build_discourse_graph as build_discourse_graph_exports
 from observatoire.discourse_graph import empty_discursive_communities_df
@@ -1817,6 +1821,11 @@ def run_pipeline(
     claim_cluster_distance_threshold: float = 0.35,
     discursive_card_min_confidence: float = 0.55,
     discursive_card_limit: Optional[int] = None,
+    discursive_card_prompt: Path | str = "prompts/extract_discursive_card.md",
+    discursive_card_cache: Optional[Path | str] = None,
+    disable_discursive_card_cache: bool = False,
+    discursive_card_workers: int = 1,
+    reuse_discourse_cards: bool = False,
     discursive_cluster_min_size: int = 6,
     discursive_cluster_distance_threshold: float = 0.35,
     discourse_graph_min_community_size: int = 4,
@@ -1945,17 +1954,37 @@ def run_pipeline(
 
     should_extract_discourse_cards = extract_discourse_cards or cluster_discourse_cards or build_discourse_graph
     if should_extract_discourse_cards:
-        client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key, base_url=llm_base_url)
-        if client is None:
-            raise RuntimeError("Discursive card extraction requires an LLM provider. Use --llm-provider openai or ollama.")
-        print("Extraction des fiches discursives structurées par LLM.")
-        discursive_cards_df = extract_discursive_cards_from_comments(
-            semantic_df,
-            client=client,
-            min_confidence=discursive_card_min_confidence,
-            limit=discursive_card_limit,
+        existing_cards_path = outputs_path / "discursive_cards.csv"
+        should_reuse_existing_cards = existing_cards_path.exists() and (
+            reuse_discourse_cards or not extract_discourse_cards
         )
-        discursive_cards_df.to_csv(outputs_path / "discursive_cards.csv", index=False)
+        if should_reuse_existing_cards:
+            print(f"Réutilisation des fiches discursives existantes : {existing_cards_path}")
+            discursive_cards_df = pd.read_csv(existing_cards_path).reindex(columns=DISCURSIVE_CARD_COLUMNS)
+        else:
+            client = make_llm_client(llm_provider, llm_model, api_key=llm_api_key, base_url=llm_base_url)
+            if client is None:
+                raise RuntimeError("Discursive card extraction requires an LLM provider. Use --llm-provider openai or ollama.")
+            cache_path = None
+            if not disable_discursive_card_cache:
+                cache_path = Path(discursive_card_cache) if discursive_card_cache else outputs_path / "discursive_card_llm_cache.jsonl"
+            print(
+                "Extraction des fiches discursives structurées par LLM "
+                f"(workers={max(1, int(discursive_card_workers or 1))}, "
+                f"cache={'off' if cache_path is None else cache_path}, "
+                f"prompt={discursive_card_prompt})."
+            )
+            discursive_cards_df = extract_discursive_cards_from_comments(
+                semantic_df,
+                client=client,
+                prompt_path=discursive_card_prompt,
+                min_confidence=discursive_card_min_confidence,
+                limit=discursive_card_limit,
+                llm_cache_path=cache_path,
+                cache_namespace=f"{llm_provider}:{llm_model}",
+                workers=discursive_card_workers,
+            )
+            discursive_cards_df.to_csv(existing_cards_path, index=False)
         write_discursive_card_coverage(
             semantic_df,
             discursive_cards_df,
@@ -2147,6 +2176,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--claim-cluster-distance-threshold", type=float, default=0.35)
     parser.add_argument("--discursive-card-min-confidence", type=float, default=0.55)
     parser.add_argument("--discursive-card-limit", type=int, default=None)
+    parser.add_argument("--discursive-card-prompt", default="prompts/extract_discursive_card.md")
+    parser.add_argument("--discursive-card-cache", default=None, help="Cache JSONL des réponses LLM pour les fiches discursives.")
+    parser.add_argument("--disable-discursive-card-cache", action="store_true", help="Désactiver le cache LLM des fiches discursives.")
+    parser.add_argument("--discursive-card-workers", type=int, default=1, help="Nombre d'appels LLM concurrents pour les fiches discursives.")
+    parser.add_argument("--reuse-discourse-cards", action="store_true", help="Réutiliser outputs/discursive_cards.csv si présent.")
     parser.add_argument("--discursive-cluster-min-size", type=int, default=6)
     parser.add_argument("--discursive-cluster-distance-threshold", type=float, default=0.35)
     parser.add_argument("--discourse-graph-min-community-size", type=int, default=4)
@@ -2189,6 +2223,11 @@ def main() -> None:
         claim_cluster_distance_threshold=args.claim_cluster_distance_threshold,
         discursive_card_min_confidence=args.discursive_card_min_confidence,
         discursive_card_limit=args.discursive_card_limit,
+        discursive_card_prompt=args.discursive_card_prompt,
+        discursive_card_cache=args.discursive_card_cache,
+        disable_discursive_card_cache=args.disable_discursive_card_cache,
+        discursive_card_workers=args.discursive_card_workers,
+        reuse_discourse_cards=args.reuse_discourse_cards,
         discursive_cluster_min_size=args.discursive_cluster_min_size,
         discursive_cluster_distance_threshold=args.discursive_cluster_distance_threshold,
         discourse_graph_min_community_size=args.discourse_graph_min_community_size,

@@ -35,6 +35,12 @@
       "actor": "RN",
       "sequence": "Interview Jordan Bardella",
       "label": "Jordan Bardella répond à une interview"
+    },          
+    {
+      "video_url": "https://www.youtube.com/watch?v=nD4s8gECULQ",
+      "actor": "Media",
+      "sequence": "Interview Marine Le Pen",
+      "label": "Marine Le Pen répond à une interview"
     }          
 
   ]
