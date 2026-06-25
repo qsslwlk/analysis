@@ -1,0 +1,125 @@
+{
+  "stance": {
+    "allowed": ["supportive", "hostile", "ambivalent", "unclear"],
+    "aliases": {
+      "adhesion": "supportive",
+      "appui": "supportive",
+      "favorable": "supportive",
+      "soutien": "supportive",
+      "support": "supportive",
+      "critique": "hostile",
+      "defavorable": "hostile",
+      "opposition": "hostile",
+      "rejet": "hostile",
+      "scepticisme": "ambivalent",
+      "sceptique": "ambivalent",
+      "ambigu": "ambivalent",
+      "flou": "unclear",
+      "incertain": "unclear"
+    }
+  },
+  "macro_frames": {
+    "mobilisation": ["appel_vote", "engagement_militant", "victoire_possible"],
+    "justice_sociale": ["pouvoir_achat", "justice_fiscale", "dignite_sociale"],
+    "anti_elite": ["critique_macronisme", "critique_medias", "oligarchie"],
+    "competence": ["credibilite_programme", "faisabilite_economique", "serieux"],
+    "souverainete": ["independance_nationale", "europe_frontieres", "priorite_nationale"],
+    "ordre": ["securite", "autorite", "chaos"],
+    "ecologie": ["transition_ecologique", "sante_environnementale"],
+    "other": ["other"]
+  },
+  "frame_aliases": {
+    "appel a l action": "appel_vote",
+    "appel a l action collective": "engagement_militant",
+    "appel au vote": "appel_vote",
+    "cadrage critique": "critique_macronisme",
+    "cadrage moral": "justice_fiscale",
+    "credibilite economique": "faisabilite_economique",
+    "encouragement et soutien": "engagement_militant",
+    "justice sociale": "pouvoir_achat",
+    "justice sociale et fiscale": "justice_fiscale",
+    "optimiste": "victoire_possible",
+    "perspective politique": "victoire_possible",
+    "positif": "engagement_militant",
+    "problematique economique": "pouvoir_achat",
+    "soutien politique": "engagement_militant"
+  },
+  "argument_family": {
+    "allowed": [
+      "programmatique",
+      "moral",
+      "economique",
+      "identitaire",
+      "institutionnel",
+      "mediatique",
+      "competence",
+      "mobilisation",
+      "other",
+      "unclear"
+    ],
+    "aliases": {
+      "biais mediatique": "mediatique",
+      "economique": "economique",
+      "esthetique": "other",
+      "moral": "moral",
+      "programmatique": "programmatique",
+      "politique": "institutionnel",
+      "persuasion": "mobilisation"
+    }
+  },
+  "tone": {
+    "allowed": [
+      "enthusiasm",
+      "anger",
+      "concern",
+      "hope",
+      "irony",
+      "mistrust",
+      "admiration",
+      "neutral",
+      "other",
+      "unclear"
+    ],
+    "aliases": {
+      "admiration": "admiration",
+      "anxiete": "concern",
+      "colere": "anger",
+      "encouragement": "hope",
+      "enthousiasme": "enthusiasm",
+      "enthousiaste": "enthusiasm",
+      "espoir": "hope",
+      "fierte": "hope",
+      "inquietude": "concern",
+      "indignation": "anger",
+      "ironie": "irony",
+      "mefiance": "mistrust",
+      "optimisme": "hope",
+      "optimiste": "hope",
+      "scepticisme": "mistrust"
+    }
+  },
+  "rhetorical_register": {
+    "allowed": [
+      "support",
+      "criticism",
+      "call_to_action",
+      "testimony",
+      "question",
+      "sarcasm",
+      "accusation",
+      "policy_argument",
+      "other",
+      "unclear"
+    ],
+    "aliases": {
+      "appel a l action": "call_to_action",
+      "appel au vote": "call_to_action",
+      "critique": "criticism",
+      "denonciation": "criticism",
+      "objection": "question",
+      "programmatique": "policy_argument",
+      "soutien partisan": "support",
+      "temoignage": "testimony"
+    }
+  }
+}

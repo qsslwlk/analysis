@@ -465,7 +465,10 @@ def _build_nodes_and_edges(cards_df: pd.DataFrame, comments_df: pd.DataFrame) ->
         for theme in [row.get("theme_main"), *_split_terms(row.get("subthemes_json"))]:
             add_edge(comment_node, add_node("ThemeNode", theme), "COMMENT_HAS_THEME", comment_id=comment_id)
 
-        frame_labels = [row.get("dominant_frame"), *_split_terms(row.get("secondary_frames_json"))]
+        frame_labels = [
+            row.get("frame_primary") or row.get("dominant_frame"),
+            *_split_terms(row.get("secondary_frames_json")),
+        ]
         for frame in frame_labels:
             add_edge(comment_node, add_node("FrameNode", frame), "COMMENT_HAS_FRAME", comment_id=comment_id)
 
@@ -476,7 +479,7 @@ def _build_nodes_and_edges(cards_df: pd.DataFrame, comments_df: pd.DataFrame) ->
         attack_or_objection = _string(row.get("attack_or_objection"))
         add_edge(comment_node, add_node("ClaimNode", attack_or_objection), "COMMENT_HAS_CLAIM", comment_id=comment_id)
 
-        argument_type = _string(row.get("argument_type"))
+        argument_type = _string(row.get("argument_family_controlled") or row.get("argument_type"))
         argument_node = add_node("ArgumentFamilyNode", argument_type)
         add_edge(comment_node, argument_node, "COMMENT_HAS_ARGUMENT_FAMILY", comment_id=comment_id)
         add_edge(canonical_claim_node, argument_node, "CLAIM_BELONGS_TO_ARGUMENT_FAMILY")
@@ -485,10 +488,11 @@ def _build_nodes_and_edges(cards_df: pd.DataFrame, comments_df: pd.DataFrame) ->
             frame_node = add_node("FrameNode", frame)
             add_edge(frame_node, canonical_claim_node, "FRAME_CO_OCCURS_WITH_CLAIM")
 
-        for stance_item in _loads_list(row.get("stance_targets_json")):
+        stance_payload = row.get("stance_targets_controlled_json") or row.get("stance_targets_json")
+        for stance_item in _loads_list(stance_payload):
             if not isinstance(stance_item, dict):
                 continue
-            target = _string(stance_item.get("target") or stance_item.get("cible"))
+            target = _string(stance_item.get("target_normalized") or stance_item.get("target") or stance_item.get("cible"))
             stance = _normalize_stance(stance_item.get("stance") or stance_item.get("position"))
             evidence = stance_item.get("evidence") or stance_item.get("evidence_quote") or stance_item.get("citation")
             confidence = _coerce_float(stance_item.get("confidence"), default=_coerce_float(row.get("confidence"), 1.0))
@@ -514,10 +518,10 @@ def _build_nodes_and_edges(cards_df: pd.DataFrame, comments_df: pd.DataFrame) ->
                 raw_value=stance_label,
             )
 
-        for tone in _split_terms(row.get("emotion_tone")):
+        for tone in _split_terms(row.get("tone_controlled") or row.get("emotion_tone")):
             add_edge(comment_node, add_node("ToneNode", tone), "COMMENT_HAS_TONE", comment_id=comment_id)
 
-        register = _string(row.get("register") or row.get("rhetorical_tone"))
+        register = _string(row.get("rhetorical_register") or row.get("register") or row.get("rhetorical_tone"))
         for item in _split_terms(register):
             add_edge(comment_node, add_node("RegisterNode", item), "COMMENT_HAS_REGISTER", comment_id=comment_id)
 
@@ -837,4 +841,3 @@ def build_discourse_graph(
         profiles_path=profiles_path,
         incidence_paths=incidence_paths,
     )
-

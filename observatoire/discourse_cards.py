@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from observatoire.llm import LLMClient
+from observatoire.discourse_taxonomy import DEFAULT_TAXONOMY_PATH, normalize_discursive_cards
 
 
 DEFAULT_PROMPT_PATH = Path("prompts/extract_discursive_card.md")
@@ -32,6 +33,17 @@ DISCURSIVE_CARD_COLUMNS = [
     "ambiguities_json",
     "representative_quotes_json",
     "confidence",
+    "dominant_frame_free",
+    "macro_frame",
+    "frame_primary",
+    "argument_family_controlled",
+    "tone_controlled",
+    "rhetorical_register",
+    "stance_targets_controlled_json",
+    "targets_normalized_json",
+    "evidence_score",
+    "ambiguity_score",
+    "taxonomy_fit_score",
     "discursive_summary",
     "raw_comment_preview",
 ]
@@ -169,6 +181,7 @@ def extract_discursive_cards_from_comments(
     comments_df: pd.DataFrame,
     client: LLMClient,
     prompt_path: Path | str = DEFAULT_PROMPT_PATH,
+    taxonomy_path: Path | str = DEFAULT_TAXONOMY_PATH,
     min_confidence: float = 0.55,
     limit: Optional[int] = None,
 ) -> pd.DataFrame:
@@ -209,7 +222,11 @@ def extract_discursive_cards_from_comments(
             }
         )
 
-    return pd.DataFrame(rows, columns=DISCURSIVE_CARD_COLUMNS)
+    cards_df = pd.DataFrame(rows)
+    if cards_df.empty:
+        return empty_discursive_cards_df()
+    normalized_df = normalize_discursive_cards(cards_df, taxonomy_path=taxonomy_path)
+    return normalized_df.reindex(columns=DISCURSIVE_CARD_COLUMNS)
 
 
 def write_discursive_card_coverage(

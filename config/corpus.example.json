@@ -17,7 +17,26 @@
       "actor": "Media",
       "sequence": "pouvoir_achat",
       "label": "Pouvoir d'achat, salaires, impôts : qui propose quoi ?"
-    }
+    },
+    {
+      "video_url": "https://www.youtube.com/watch?v=qyx4OgSJm2M",
+      "actor": "Media",
+      "sequence": "racisme",
+      "label": "LFI dénonce le racisme du RN"
+    },
+    {
+      "video_url": "https://www.youtube.com/watch?v=6ruS-hrujhI",
+      "actor": "LFI",
+      "sequence": "autonomie de la Corse",
+      "label": "Jean-Luc Mélenchon réagit au vote du projet de loi pour l'autonomie de la Corse"
+    },
+    {
+      "video_url": "https://www.youtube.com/watch?v=n3Nwg_aXnuE",
+      "actor": "RN",
+      "sequence": "Interview Jordan Bardella",
+      "label": "Jordan Bardella répond à une interview"
+    }          
+
   ]
 }
 
