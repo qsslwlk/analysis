@@ -6,6 +6,9 @@
   "llm_base_url": "http://localhost:11434",
   "discursive_card_min_confidence": 0.55,
   "discursive_card_limit": 50,
+  "discursive_card_prompt": "prompts/extract_discursive_card_fast.md",
+  "discursive_card_workers": 2,
+  "reuse_discourse_cards": true,
   "discursive_cluster_min_size": 6,
   "discursive_cluster_distance_threshold": 0.35
 }

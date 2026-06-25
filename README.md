@@ -97,6 +97,44 @@ python -m observatoire.cli \
   --discursive-card-limit 50
 ```
 
+Pour accélérer l'annotation locale avec Ollama, utilisez le prompt rapide, le cache LLM et éventuellement deux workers :
+
+```bash
+export OLLAMA_KEEP_ALIVE=30m
+export OLLAMA_NUM_PREDICT=768
+
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-discourse-cards \
+  --build-discourse-graph \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b \
+  --discursive-card-prompt prompts/extract_discursive_card_fast.md \
+  --discursive-card-workers 2
+```
+
+Les réponses LLM sont mises en cache dans `outputs/discursive_card_llm_cache.jsonl`. Une relance qui reconstruit seulement le graphe réutilise automatiquement `outputs/discursive_cards.csv` si le fichier existe :
+
+```bash
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --build-discourse-graph \
+  --llm-provider ollama \
+  --llm-model llama3.1:8b
+```
+
+Pour forcer explicitement la réutilisation même si `--extract-discourse-cards` est présent :
+
+```bash
+python -m observatoire.cli \
+  --config config/corpus.example.json \
+  --extract-discourse-cards \
+  --build-discourse-graph \
+  --reuse-discourse-cards
+```
+
+Voir `docs/LLM_ANNOTATION_SPEED.md` pour les stratégies de vitesse, les compromis qualité et les commandes de benchmark.
+
 Pour un petit corpus, les communautés peuvent rester vides. Pour explorer seulement, abaissez `--discourse-graph-min-community-size` ou `--discourse-graph-similarity-threshold`.
 
 Visualisation interactive du graphe complet, colorée par source :
@@ -120,6 +158,42 @@ Le script produit :
 - `outputs/discursive_filtered_graph_by_source.html` : version filtrée, utile pour retirer les hubs trop génériques.
 - `outputs/discursive_comment_projection_by_source.html` : projection commentaire-commentaire si des arêtes de similarité existent.
 
+### Post-traitement sans ré-encodage
+
+Deux scripts permettent d'itérer sur les sorties V2.6.3 sans relancer le LLM ni recalculer les embeddings. La documentation complète est dans `docs/GRAPH_POSTPROCESSING.md`.
+
+Post-traiter le graphe discursif et recalculer une projection commentaire-commentaire plus filtrée :
+
+```bash
+python scripts/postprocess_discursive_graph.py \
+  --input-dir outputs \
+  --output-dir outputs/graph_postprocess \
+  --include-similarity-edges \
+  --similarity-threshold 0.85 \
+  --drop-non-signal-labels
+```
+
+Visualiser les principaux ponts discursifs entre deux sources, par défaut RN et LFI :
+
+```bash
+python scripts/visualize_rn_lfi_bridges.py \
+  --input-dir outputs \
+  --output-dir outputs/rn_lfi_bridges \
+  --source-a RN \
+  --source-b LFI
+```
+
+Transformer ces ponts en rapport lisible et auditable :
+
+```bash
+python scripts/generate_bridge_report.py \
+  --input-dir outputs \
+  --bridge-dir outputs/rn_lfi_bridges \
+  --output-dir outputs/rn_lfi_bridges
+```
+
+Ces scripts produisent des CSV d'audit, des diagnostics JSON, des exports GEXF et des HTML autonomes. Ils filtrent les labels vagues comme `other`/`unknown`, pénalisent les attributs trop fréquents et utilisent des tailles de nœuds dépendantes du degré ou du score de pont.
+
 ## Structure générée
 
 ```text
@@ -140,6 +214,7 @@ Le script produit :
     ├── semantic_filter_summary.csv
     ├── discursive_cards.csv
     ├── discursive_card_coverage.csv
+    ├── discursive_card_llm_cache.jsonl
     ├── discursive_clusters.csv
     ├── discursive_units.csv
     ├── discursive_units.jsonl
@@ -151,6 +226,25 @@ Le script produit :
     ├── discursive_full_graph_by_source.html
     ├── discursive_filtered_graph_by_source.html
     ├── discursive_comment_projection_by_source.html
+    ├── graph_postprocess/
+    │   ├── postprocessed_comment_communities.csv
+    │   ├── postprocessed_community_summary.csv
+    │   ├── postprocessed_comment_projection_edges.csv
+    │   ├── postprocessed_graph_diagnostics.json
+    │   ├── discursive_full_graph.gexf
+    │   ├── discursive_comment_projection.gexf
+    │   ├── discursive_full_graph_by_source.html
+    │   └── discursive_comment_projection_by_source.html
+    ├── rn_lfi_bridges/
+    │   ├── rn_lfi_attribute_bridges.csv
+    │   ├── rn_lfi_direct_similarity_bridges.csv
+    │   ├── rn_lfi_bridge_subgraph_nodes.csv
+    │   ├── rn_lfi_bridge_subgraph_edges.csv
+    │   ├── rn_lfi_bridge_diagnostics.json
+    │   ├── rn_lfi_bridge_graph.gexf
+    │   ├── rn_lfi_bridge_graph.html
+    │   ├── bridge_report.csv
+    │   └── bridge_report.md
     ├── discursive_incidence_frame.npz
     ├── discursive_incidence_claim.npz
     ├── discursive_incidence_stance.npz
@@ -297,6 +391,8 @@ Erreurs gérées explicitement :
 - Graphe discursif typé V2.6.3 : commentaires reliés à frames, claims canoniques, cibles, stances, tonalités, source vidéo et période.
 - Communautés discursives interprétables à partir d'une similarité hybride par matrices d'incidence pondérées.
 - Visualisation HTML interactive du graphe discursif complet, filtré et de la projection commentaire-commentaire.
+- Post-traitement sans ré-encodage du graphe discursif, avec projection filtrée, diagnostics de hubs et exports GEXF/HTML.
+- Visualisation des ponts RN/LFI ou entre deux sources configurables, à partir des attributs discursifs partagés et des similarités directes.
 - Extraction inductive optionnelle de claims par LLM OpenAI ou Ollama, avec preuve textuelle obligatoire.
 - Clustering optionnel des claims plutôt que des commentaires bruts.
 - Réduction 2D par PCA, UMAP si disponible.
@@ -361,7 +457,7 @@ Socle posé :
 
 Prochaines extensions :
 
-- Ajuster empiriquement la taille des nœuds dans les visualisations en fonction du degré pour mieux faire ressortir les hubs sans écraser les petits signaux.
+- Calibrer empiriquement les seuils de projection, les pénalités de hubs et les tailles de nœuds sur plusieurs corpus.
 - BERTopic pour des topics plus lisibles.
 - Détection de stance par modèle local ou API.
 - Annotation humaine assistée.

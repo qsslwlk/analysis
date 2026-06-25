@@ -79,6 +79,19 @@ class OllamaChatClient:
         self.base_url = os.getenv("OLLAMA_BASE_URL", self.base_url).rstrip("/")
 
     def complete_json(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
+        options: Dict[str, Any] = {"temperature": 0}
+        for env_name, option_name in [
+            ("OLLAMA_NUM_CTX", "num_ctx"),
+            ("OLLAMA_NUM_PREDICT", "num_predict"),
+            ("OLLAMA_NUM_THREAD", "num_thread"),
+            ("OLLAMA_NUM_GPU", "num_gpu"),
+        ]:
+            value = os.getenv(env_name)
+            if value:
+                try:
+                    options[option_name] = int(value)
+                except ValueError:
+                    options[option_name] = value
         payload = {
             "model": self.model,
             "messages": [
@@ -87,8 +100,11 @@ class OllamaChatClient:
             ],
             "stream": False,
             "format": "json",
-            "options": {"temperature": 0},
+            "options": options,
         }
+        keep_alive = os.getenv("OLLAMA_KEEP_ALIVE")
+        if keep_alive:
+            payload["keep_alive"] = keep_alive
         response = requests.post(
             f"{self.base_url}/api/chat",
             json=payload,

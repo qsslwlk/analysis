@@ -34,6 +34,35 @@ class LLMClientTest(unittest.TestCase):
         self.assertIsInstance(client, OllamaChatClient)
         self.assertEqual(client.model, "llama3.1:8b")
 
+    def test_ollama_client_accepts_generation_options_from_env(self):
+        fake_response = Mock()
+        fake_response.status_code = 200
+        fake_response.json.return_value = {"message": {"content": '{"discursive_card": null}'}}
+        fake_response.text = ""
+
+        with patch.dict(
+            "os.environ",
+            {
+                "OLLAMA_NUM_CTX": "2048",
+                "OLLAMA_NUM_PREDICT": "512",
+                "OLLAMA_NUM_THREAD": "8",
+                "OLLAMA_KEEP_ALIVE": "30m",
+            },
+        ):
+            with patch("observatoire.llm.requests.post", return_value=fake_response) as post:
+                client = make_llm_client(
+                    provider="ollama",
+                    model="llama3.1:8b",
+                    base_url="http://localhost:11434",
+                )
+                client.complete_json("system", "user")
+
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual(payload["options"]["num_ctx"], 2048)
+        self.assertEqual(payload["options"]["num_predict"], 512)
+        self.assertEqual(payload["options"]["num_thread"], 8)
+        self.assertEqual(payload["keep_alive"], "30m")
+
     def test_parse_json_content_tolerates_fenced_json(self):
         payload = _parse_json_content('```json\n{"claims": []}\n```')
 

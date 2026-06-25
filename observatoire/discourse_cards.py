@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import threading
 import textwrap
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -80,6 +83,59 @@ def _list(value: Any) -> List[Any]:
 
 def _json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False)
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _cache_key(system_prompt: str, user_prompt: str, namespace: str = "") -> str:
+    payload = {
+        "kind": "discursive_card",
+        "version": 1,
+        "namespace": namespace,
+        "system_prompt_sha256": _sha256_text(system_prompt),
+        "user_prompt_sha256": _sha256_text(user_prompt),
+    }
+    return _sha256_text(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+
+
+def _load_llm_cache(path: Optional[Path | str]) -> Dict[str, Dict[str, Any]]:
+    if path is None:
+        return {}
+    cache_path = Path(path)
+    if not cache_path.exists():
+        return {}
+    cache: Dict[str, Dict[str, Any]] = {}
+    with cache_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            key = entry.get("cache_key")
+            payload = entry.get("payload")
+            if isinstance(key, str) and isinstance(payload, dict):
+                cache[key] = payload
+    return cache
+
+
+def _append_llm_cache_entry(
+    path: Optional[Path | str],
+    entry: Dict[str, Any],
+    lock: threading.Lock,
+) -> None:
+    if path is None:
+        return
+    cache_path = Path(path)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(entry, ensure_ascii=False, sort_keys=True)
+    with lock:
+        with cache_path.open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
 
 
 def _coerce_stances(value: Any) -> List[Dict[str, Any]]:
@@ -184,6 +240,9 @@ def extract_discursive_cards_from_comments(
     taxonomy_path: Path | str = DEFAULT_TAXONOMY_PATH,
     min_confidence: float = 0.55,
     limit: Optional[int] = None,
+    llm_cache_path: Optional[Path | str] = None,
+    cache_namespace: str = "",
+    workers: int = 1,
 ) -> pd.DataFrame:
     """Extract one structured discursive card per semantic candidate comment."""
     if comments_df.empty:
@@ -196,16 +255,47 @@ def extract_discursive_cards_from_comments(
     if limit is not None:
         candidates = candidates.head(limit)
 
-    rows: List[Dict[str, Any]] = []
-    for _, comment in candidates.iterrows():
-        payload = client.complete_json(
-            system_prompt=system_prompt,
-            user_prompt=build_discursive_card_user_prompt(comment),
-        )
+    if candidates.empty:
+        return empty_discursive_cards_df()
+
+    cache = _load_llm_cache(llm_cache_path)
+    cache_lock = threading.Lock()
+    append_lock = threading.Lock()
+    stats = {"cache_hits": 0, "cache_misses": 0, "cards_kept": 0, "cards_dropped": 0}
+
+    def process_comment(comment_dict: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str]:
+        comment = pd.Series(comment_dict)
+        user_prompt = build_discursive_card_user_prompt(comment)
+        key = _cache_key(system_prompt, user_prompt, namespace=cache_namespace)
+        with cache_lock:
+            payload = cache.get(key)
+        if payload is None:
+            payload = client.complete_json(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
+            with cache_lock:
+                cache[key] = payload
+            _append_llm_cache_entry(
+                llm_cache_path,
+                {
+                    "cache_key": key,
+                    "comment_id": comment.get("comment_id"),
+                    "cache_namespace": cache_namespace,
+                    "system_prompt_sha256": _sha256_text(system_prompt),
+                    "user_prompt_sha256": _sha256_text(user_prompt),
+                    "payload": payload,
+                },
+                append_lock,
+            )
+            cache_status = "miss"
+        else:
+            cache_status = "hit"
+
         card = _coerce_card(payload, min_confidence=min_confidence)
         if card is None:
-            continue
-        rows.append(
+            return None, cache_status
+        return (
             {
                 "card_id": f"{comment.get('comment_id')}::discursive_card",
                 "comment_id": comment.get("comment_id"),
@@ -219,7 +309,32 @@ def extract_discursive_cards_from_comments(
                     placeholder="...",
                 ),
                 **card,
-            }
+            },
+            cache_status,
+        )
+
+    records = candidates.to_dict("records")
+    max_workers = max(1, int(workers or 1))
+    rows: List[Dict[str, Any]] = []
+    if max_workers == 1:
+        results = [process_comment(record) for record in records]
+    else:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(process_comment, records))
+
+    for row, cache_status in results:
+        stats["cache_hits" if cache_status == "hit" else "cache_misses"] += 1
+        if row is None:
+            stats["cards_dropped"] += 1
+            continue
+        stats["cards_kept"] += 1
+        rows.append(row)
+
+    if llm_cache_path is not None:
+        print(
+            "Cache fiches discursives LLM : "
+            f"{stats['cache_hits']} hit(s), {stats['cache_misses']} miss(es), "
+            f"{stats['cards_kept']} fiche(s) gardée(s), {stats['cards_dropped']} ignorée(s)."
         )
 
     cards_df = pd.DataFrame(rows)
